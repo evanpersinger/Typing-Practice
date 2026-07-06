@@ -1,0 +1,14 @@
+[project]
+name = "typing-practice"
+version = "0.1.0"
+description = "Personalized typing trainer that focuses on your weaknesses."
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "anthropic",
+    "python-dotenv",
+]
+
+[tool.uv]
+package = false

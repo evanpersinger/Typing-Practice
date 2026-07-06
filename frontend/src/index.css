@@ -1,0 +1,109 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  color: #1a1a1a;
+  background: #f7f7f5;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.card {
+  width: 100%;
+  max-width: 640px;
+  background: #ffffff;
+  border: 1px solid #e5e5e0;
+  border-radius: 12px;
+  padding: 32px;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0 0 8px;
+}
+
+.subtitle {
+  color: #666;
+  margin: 0 0 24px;
+}
+
+.progress {
+  color: #888;
+  font-size: 0.85rem;
+  margin-bottom: 12px;
+}
+
+.prompt {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.typing-input {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.1rem;
+  padding: 12px 14px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  outline: none;
+}
+
+.typing-input:focus {
+  border-color: #6b8afd;
+}
+
+.hint {
+  color: #999;
+  font-size: 0.8rem;
+  margin-top: 10px;
+}
+
+button {
+  font-size: 1rem;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: #2f6fed;
+  color: white;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #245ad0;
+}
+
+.error {
+  color: #c0392b;
+  margin-top: 16px;
+}
+
+.summary {
+  line-height: 1.6;
+}
+
+.recap {
+  color: #444;
+  margin-bottom: 16px;
+}
+
+.new-word {
+  margin: 6px 0;
+}
+
+.new-word b {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
