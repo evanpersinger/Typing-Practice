@@ -6,3 +6,4 @@ typing.db
 weak_words.md
 node_modules/
 dist/
+.claude/settings.local.json
