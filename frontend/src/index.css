@@ -1,7 +1,7 @@
 :root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: #1a1a1a;
-  background: #f7f7f5;
+  color: #ecebe5;
+  background: #172338;
 }
 
 * {
@@ -23,8 +23,8 @@ body {
 .card {
   width: 100%;
   max-width: 640px;
-  background: #ffffff;
-  border: 1px solid #e5e5e0;
+  background: #1f3057;
+  border: 1px solid #2d3f66;
   border-radius: 12px;
   padding: 32px;
 }
@@ -35,12 +35,12 @@ h1 {
 }
 
 .subtitle {
-  color: #666;
+  color: #a3b2cc;
   margin: 0 0 24px;
 }
 
 .progress {
-  color: #888;
+  color: #8b9cb8;
   font-size: 0.85rem;
   margin-bottom: 12px;
 }
@@ -57,9 +57,15 @@ h1 {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 1.1rem;
   padding: 12px 14px;
-  border: 1px solid #ccc;
+  color: #ecebe5;
+  background: #16233b;
+  border: 1px solid #3b4b6e;
   border-radius: 8px;
   outline: none;
+}
+
+.typing-input::placeholder {
+  color: #6f7f9c;
 }
 
 .typing-input:focus {
@@ -67,7 +73,7 @@ h1 {
 }
 
 .hint {
-  color: #999;
+  color: #8b9cb8;
   font-size: 0.8rem;
   margin-top: 10px;
 }
@@ -87,7 +93,7 @@ button:hover {
 }
 
 .error {
-  color: #c0392b;
+  color: #ff7a70;
   margin-top: 16px;
 }
 
@@ -96,7 +102,7 @@ button:hover {
 }
 
 .recap {
-  color: #444;
+  color: #c3cbd9;
   margin-bottom: 16px;
 }
 
