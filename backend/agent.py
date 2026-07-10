@@ -16,7 +16,17 @@ from pydantic import BaseModel
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")  # picks up ANTHROPIC_API_KEY
 
-MODEL = "claude-opus-4-8"  # one place to change the model for both calls
+"""
+Model to use for Claude calls:
+Available model IDs (latest generation):
+claude-opus-4-8             Opus 4.8   - most capable, slowest, priciest
+claude-opus-4-6
+claude-sonnet-5             Sonnet 5   - strong all-rounder, good balance
+claude-fable-5              Fable 5    - Claude 5 family
+claude-haiku-4-5-20251001   Haiku 4.5  - fastest, cheapest, lightest
+"""
+
+MODEL = "claude-opus-4-8"
 
 _client: Anthropic | None = None
 
@@ -29,7 +39,7 @@ def _get_client() -> Anthropic:
     return _client
 
 
-# --- structured output shapes (Claude is forced to return exactly these) ---
+# structured output shapes (Claude is forced to return exactly these)
 
 class Drill(BaseModel):
     sentence: str
@@ -50,14 +60,14 @@ class Analysis(BaseModel):
     new_words: list[WordSuggestion]
 
 
-# --- session start: generate practice sentences ---
+# session start: generate practice sentences
 
 def generate_drills(words: list[str], count: int = 20) -> GeneratedDrills:
     joined = ", ".join(words)
     prompt = (
         f"Write {count} English typing-practice items of mixed length and form: "
-        "some short phrases (2-5 words), some medium sentences, and some longer "
-        "ones (up to ~15 words). Vary them so the set feels random. "
+        "some short phrases (4-7 words), some medium sentences (8-13), and some longer "
+        "ones (13-18). Vary them so the set feels random. "
         f"Weave in these words the user commonly misspells, spread across the set so "
         f"each word appears at least once: {joined}. "
         "Keep them everyday and easy to read. "
@@ -65,14 +75,14 @@ def generate_drills(words: list[str], count: int = 20) -> GeneratedDrills:
     )
     response = _get_client().messages.parse(
         model=MODEL,
-        max_tokens=4000,
+        max_tokens=600,
         messages=[{"role": "user", "content": prompt}],
         output_format=GeneratedDrills,
     )
     return response.parsed_output
 
 
-# --- session end: find the pattern behind the misses ---
+# session end: find the pattern behind the misses
 
 def analyze_session(misses: list[dict]) -> Analysis:
     """`misses` is a list of {"word": target, "typed": what_the_user_typed}."""
@@ -91,8 +101,10 @@ def analyze_session(misses: list[dict]) -> Analysis:
     )
     response = _get_client().messages.parse(
         model=MODEL,
-        max_tokens=2000,
-        messages=[{"role": "user", "content": prompt}],
+        max_tokens=1500,
+        messages=[
+            {"role": "user",
+             "content": prompt}],
         output_format=Analysis,
     )
     return response.parsed_output

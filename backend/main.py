@@ -37,14 +37,20 @@ app.add_middleware(
 )
 
 
-class Result(BaseModel):
+class WordResult(BaseModel):
     word: str
     typed: str
     correct: bool
 
 
+class DrillResult(BaseModel):
+    sentence: str
+    typed: str
+    words: list[WordResult]
+
+
 class ResultsPayload(BaseModel):
-    results: list[Result]
+    results: list[DrillResult]
 
 
 @app.get("/drills")
@@ -60,18 +66,24 @@ def get_drills():
 @app.post("/results")
 def submit_results(payload: ResultsPayload):
     """Session end: bookkeeping in code, pattern-finding via the agent."""
-    for result in payload.results:
-        db.record_result(result.word, result.typed, result.correct)
+    misses: list[dict] = []
+    for drill in payload.results:
+        for word in drill.words:
+            db.record_result(word.word, word.typed, word.correct)
+            if not word.correct:
+                misses.append({"word": word.word, "typed": word.typed})
 
-    misses = [
-        {"word": r.word, "typed": r.typed} for r in payload.results if not r.correct
-    ]
     analysis = agent.analyze_session(misses)
 
     for suggestion in analysis.new_words:
         db.add_word(suggestion.word, source="agent")
 
     db.render_markdown()
+    db.write_session_transcript(
+        [d.model_dump() for d in payload.results],
+        analysis.pattern_summary,
+        [s.model_dump() for s in analysis.new_words],
+    )
     return {
         "pattern_summary": analysis.pattern_summary,
         "new_words": [s.model_dump() for s in analysis.new_words],

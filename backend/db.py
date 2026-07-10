@@ -8,12 +8,13 @@ functions below own attempts / misses / streak / graduation.
 from __future__ import annotations
 
 import sqlite3
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "typing.db"
 MD_PATH = BASE_DIR / "weak_words.md"
+SESSIONS_DIR = BASE_DIR / "sessions"
 
 # Clean hits in a row before a word graduates from "drilling" to "mastered".
 MASTERY_STREAK = 10
@@ -158,3 +159,44 @@ def render_markdown() -> None:
             f"{row['last_seen'] or '-'} |"
         )
     MD_PATH.write_text("\n".join(lines) + "\n")
+
+
+def write_session_transcript(
+    drills: list[dict],
+    pattern_summary: str,
+    new_words: list[dict],
+) -> Path:
+    """Write one markdown file per session into sessions/ as a running history.
+
+    `drills` is a list of
+    {"sentence", "typed", "words": [{"word", "typed", "correct"}]}. Each session
+    gets its own timestamped file so the folder builds up a full history.
+    """
+    now = datetime.now()
+    SESSIONS_DIR.mkdir(exist_ok=True)
+    path = SESSIONS_DIR / f"{now:%Y-%m-%d_%H%M%S}.md"
+
+    lines = [f"# Session {now:%Y-%m-%d %H:%M:%S}", ""]
+    for i, drill in enumerate(drills, start=1):
+        lines.append(f"## Drill {i}")
+        lines.append(f"Prompt: {drill['sentence']}")
+        lines.append(f"Typed:  {drill['typed']}")
+        targets = []
+        for word in drill["words"]:
+            mark = "✓" if word["correct"] else f"✗ (typed \"{word['typed']}\")"
+            targets.append(f"{word['word']} {mark}")
+        lines.append("Targets: " + (", ".join(targets) if targets else "none"))
+        lines.append("")
+
+    lines.append("## Pattern")
+    lines.append(pattern_summary)
+    lines.append("")
+
+    if new_words:
+        lines.append("## Added to your list")
+        for w in new_words:
+            lines.append(f"- {w['word']}: {w['reason']}")
+        lines.append("")
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path

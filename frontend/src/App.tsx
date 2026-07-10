@@ -44,11 +44,18 @@ export default function App() {
   }
 
   async function finishSession(allTyped: string[]) {
-    const graded = drills.flatMap((drill, i) => gradeDrill(drill, allTyped[i] ?? ""));
-    setResults(graded);
+    const perDrill = drills.map((drill, i) => {
+      const typedText = allTyped[i] ?? "";
+      return {
+        sentence: drill.sentence,
+        typed: typedText,
+        words: gradeDrill(drill, typedText),
+      };
+    });
+    setResults(perDrill.flatMap((d) => d.words));
     setPhase("submitting");
     try {
-      const data = await submitResults(graded);
+      const data = await submitResults(perDrill);
       setAnalysis(data);
       setPhase("done");
     } catch (e) {

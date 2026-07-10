@@ -4,6 +4,7 @@ __pycache__/
 .env
 typing.db
 weak_words.md
+sessions/
 node_modules/
 dist/
 .claude/settings.local.json

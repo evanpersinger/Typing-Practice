@@ -16,6 +16,12 @@ export interface WordResult {
   correct: boolean;
 }
 
+export interface DrillResult {
+  sentence: string;
+  typed: string;
+  words: WordResult[];
+}
+
 export interface NewWord {
   word: string;
   reason: string;
@@ -33,7 +39,7 @@ export async function fetchDrills(): Promise<DrillsResponse> {
 }
 
 export async function submitResults(
-  results: WordResult[],
+  results: DrillResult[],
 ): Promise<AnalysisResponse> {
   const res = await fetch(`${API_BASE}/results`, {
     method: "POST",
