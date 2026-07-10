@@ -16,7 +16,7 @@ DB_PATH = BASE_DIR / "typing.db"
 MD_PATH = BASE_DIR / "weak_words.md"
 
 # Clean hits in a row before a word graduates from "drilling" to "mastered".
-MASTERY_STREAK = 3
+MASTERY_STREAK = 10
 
 
 def _connect() -> sqlite3.Connection:

@@ -52,18 +52,20 @@ class Analysis(BaseModel):
 
 # --- session start: generate practice sentences ---
 
-def generate_drills(words: list[str], count: int = 6) -> GeneratedDrills:
+def generate_drills(words: list[str], count: int = 20) -> GeneratedDrills:
     joined = ", ".join(words)
     prompt = (
-        f"Write {count} short, natural English sentences for a typing-practice app. "
+        f"Write {count} English typing-practice items of mixed length and form: "
+        "some short phrases (2-5 words), some medium sentences, and some longer "
+        "ones (up to ~15 words). Vary them so the set feels random. "
         f"Weave in these words the user commonly misspells, spread across the set so "
         f"each word appears at least once: {joined}. "
-        "Keep the sentences everyday and easy to read, 6-14 words each. "
-        "For each sentence, list which of the target words it contains."
+        "Keep them everyday and easy to read. "
+        "For each item, list which of the target words it contains."
     )
     response = _get_client().messages.parse(
         model=MODEL,
-        max_tokens=2000,
+        max_tokens=4000,
         messages=[{"role": "user", "content": prompt}],
         output_format=GeneratedDrills,
     )
