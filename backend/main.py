@@ -1,7 +1,5 @@
-"""FastAPI app wiring the local trainer together.
-
-Run from the project root:
-    uvicorn backend.main:app --reload
+"""
+FastAPI app wiring the local trainer together.
 """
 
 from __future__ import annotations
@@ -29,6 +27,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Typing Practice", lifespan=lifespan)
 
 # The Vite dev server runs on 5173 and calls this backend on 8000.
+# allows frontend to talk to the backend.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],

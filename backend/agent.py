@@ -1,6 +1,6 @@
 """The two Claude calls that run at the edges of a session.
 
-Nothing here touches the keystroke loop — the app only calls these at session
+Nothing here touches the keystroke loop, the app only calls these at session
 start (generate practice sentences) and session end (find the typo pattern and
 suggest new words). Swap MODEL to change which Claude model both calls use.
 """
@@ -76,7 +76,9 @@ def generate_drills(words: list[str], count: int = 20) -> GeneratedDrills:
     response = _get_client().messages.parse(
         model=MODEL,
         max_tokens=600,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[
+            {"role": "user", 
+             "content": prompt}],
         output_format=GeneratedDrills,
     )
     return response.parsed_output
@@ -108,3 +110,5 @@ def analyze_session(misses: list[dict]) -> Analysis:
         output_format=Analysis,
     )
     return response.parsed_output
+
+
