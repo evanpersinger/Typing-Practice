@@ -124,13 +124,47 @@ def get_all_words() -> list[dict]:
 
 
 def record_drill(sentence: str, typed: str, duration_ms: int) -> None:
-    """Log one timed sentence. Nothing reads this yet — it's the raw material
-    for words-per-minute, which can't be backfilled if we don't capture it now."""
+    """Log one timed sentence. The raw material for words-per-minute, which
+    can't be backfilled if we don't capture it as it happens."""
     with _connect() as conn:
         conn.execute(
             "INSERT INTO drills (sentence, typed, duration_ms) VALUES (?, ?, ?)",
             (sentence, typed, duration_ms),
         )
+
+
+def get_typing_stats() -> dict[str, int]:
+    """Words-per-minute across every timed drill.
+
+    The average is total characters over total time, not the mean of the
+    per-sentence rates. Averaging the rates would let a four-word sentence
+    count as heavily as a full one, which flatters a fast start.
+
+    A "word" is five characters, the standard typing-test convention, so this
+    stays comparable to any other wpm number you've seen.
+    """
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT COUNT(*)           AS drills,
+                   SUM(LENGTH(typed)) AS chars,
+                   SUM(duration_ms)   AS total_ms,
+                   MAX(LENGTH(typed) * 60000.0 / (5 * duration_ms)) AS best_wpm
+            FROM drills
+            WHERE duration_ms > 0 AND LENGTH(typed) > 0
+            """
+        ).fetchone()
+
+    # A skipped sentence has no time and no text, so it's filtered out above.
+    # With every row filtered the SUMs come back NULL, hence the early return.
+    if not row["drills"]:
+        return {"drills": 0, "avg_wpm": 0, "best_wpm": 0}
+
+    return {
+        "drills": row["drills"],
+        "avg_wpm": round(row["chars"] * 60000 / (5 * row["total_ms"])),
+        "best_wpm": round(row["best_wpm"]),
+    }
 
 
 def record_result(word: str, typed: str, correct: bool) -> None:

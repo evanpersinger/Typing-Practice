@@ -11,17 +11,27 @@ import {
   submitResults,
   type AnalysisResponse,
   type Drill,
+  type StatsResponse,
   type WordResult,
-  type WordStat,
 } from "./api";
 import { gradeDrill } from "./grade";
 
 type Tab = "practice" | "stats";
 type Phase = "idle" | "loading" | "typing" | "submitting" | "done";
 
-function missRate(stat: WordStat): string {
-  if (stat.attempts === 0) return "-";
-  return `${Math.round((stat.misses / stat.attempts) * 100)}%`;
+// The stats tab is a highlight reel, not an inventory. Ten rows is enough to
+// show a pattern, and any more just buries it.
+const TOP_N = 10;
+
+// A word you get right four times out of five is one you can spell.
+const ACCURACY_FLOOR = 0.8;
+
+// Zero rather than a dash on an empty denominator: the stats tab always renders
+// its real shape, so you can see what the numbers will look like before you have
+// any. Nothing here divides by zero except a stats page you haven't earned yet.
+function pct(part: number, whole: number): string {
+  if (whole === 0) return "0%";
+  return `${Math.round((part / whole) * 100)}%`;
 }
 
 export default function App() {
@@ -35,7 +45,7 @@ export default function App() {
   const [elapsed, setElapsed] = useState(0);
   const [results, setResults] = useState<WordResult[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
-  const [stats, setStats] = useState<WordStat[] | null>(null);
+  const [stats, setStats] = useState<StatsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Clock for the sentence on screen. It only ever counts time you spent
@@ -129,7 +139,7 @@ export default function App() {
     setError(null);
     try {
       const data = await fetchStats();
-      setStats(data.words);
+      setStats(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load stats.");
     }
@@ -167,8 +177,29 @@ export default function App() {
   }
 
   const correctCount = results.filter((r) => r.correct).length;
-  const drillingCount = stats?.filter((s) => s.status === "drilling").length ?? 0;
-  const masteredCount = stats?.filter((s) => s.status === "mastered").length ?? 0;
+
+  // Only words you have actually typed. A seeded word you've never seen says
+  // nothing about your spelling, and right now forty of the forty are seeds.
+  const drilled = stats?.words.filter((w) => w.attempts > 0) ?? [];
+  const totalAttempts = drilled.reduce((sum, w) => sum + w.attempts, 0);
+  const totalMisses = drilled.reduce((sum, w) => sum + w.misses, 0);
+
+  const missed = drilled
+    .filter((w) => w.misses > 0)
+    .sort((a, b) => b.misses - a.misses || b.attempts - a.attempts)
+    .slice(0, TOP_N);
+
+  // Anything already named above is excluded, so no word lands in both lists.
+  // The floor rather than a strict zero-miss rule: one bad day two months ago
+  // shouldn't disqualify a word you now get right every single time.
+  const flagged = new Set(missed.map((w) => w.word));
+  const solid = drilled
+    .filter(
+      (w) =>
+        !flagged.has(w.word) && 1 - w.misses / w.attempts >= ACCURACY_FLOOR,
+    )
+    .sort((a, b) => b.attempts - a.attempts || b.streak - a.streak)
+    .slice(0, TOP_N);
 
   // Under a second the sample is too small to mean anything, so hold at 0
   // instead of flashing a 300 wpm reading off a single keystroke.
@@ -192,7 +223,7 @@ export default function App() {
         </button>
       </nav>
 
-      <div className="card">
+      <div className={tab === "stats" ? "card card-stats" : "card"}>
         {tab === "practice" && (
           <>
             {phase === "idle" && (
@@ -266,43 +297,75 @@ export default function App() {
           <>
             {stats === null && !error && <p>Loading your stats…</p>}
 
-            {stats && stats.length === 0 && (
-              <p>No words tracked yet. Run a session first.</p>
-            )}
+            {stats && (
+              <div className="stats">
+                <section>
+                  <h2 className="stat-heading">typing speed</h2>
+                  <p className="stat-line">
+                    <b>{stats.typing.avg_wpm}</b> wpm average ·{" "}
+                    <b>{stats.typing.best_wpm}</b> wpm best ·{" "}
+                    {stats.typing.drills} sentences timed
+                  </p>
+                </section>
 
-            {stats && stats.length > 0 && (
-              <>
-                <p className="recap">
-                  {stats.length} words tracked · {drillingCount} still drilling ·{" "}
-                  {masteredCount} mastered
-                </p>
-                <table className="stats-table">
-                  <thead>
-                    <tr>
-                      <th>word</th>
-                      <th>attempts</th>
-                      <th>misses</th>
-                      <th>miss rate</th>
-                      <th>status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.map((s) => (
-                      <tr key={s.word}>
-                        <td className="stat-word">{s.word}</td>
-                        <td>{s.attempts}</td>
-                        <td>{s.misses}</td>
-                        <td>{missRate(s)}</td>
-                        <td>{s.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <p className="hint">
-                  Words per minute is being recorded now and will show up here
-                  once you have a few sessions behind you.
-                </p>
-              </>
+                <section>
+                  <h2 className="stat-heading">mistakes</h2>
+                  <p className="stat-line">
+                    <b>{totalMisses}</b> misses across {totalAttempts} attempts ·{" "}
+                    <b>{pct(totalMisses, totalAttempts)}</b> miss rate
+                  </p>
+                </section>
+
+                <div className="stat-tables">
+                  <section>
+                    <h2 className="stat-heading">commonly misspelled</h2>
+                    <table className="stats-table">
+                      <thead>
+                        <tr>
+                          <th>word</th>
+                          <th>missed</th>
+                          <th>attempts</th>
+                          <th>miss rate</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {missed.map((w) => (
+                          <tr key={w.word}>
+                            <td className="stat-word">{w.word}</td>
+                            <td>{w.misses}</td>
+                            <td>{w.attempts}</td>
+                            <td>{pct(w.misses, w.attempts)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </section>
+
+                  <section>
+                    <h2 className="stat-heading">spelled correctly often</h2>
+                    <table className="stats-table">
+                      <thead>
+                        <tr>
+                          <th>word</th>
+                          <th>correct</th>
+                          <th>attempts</th>
+                          <th>accuracy</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {solid.map((w) => (
+                          <tr key={w.word}>
+                            <td className="stat-word">{w.word}</td>
+                            <td>{w.attempts - w.misses}</td>
+                            <td>{w.attempts}</td>
+                            <td>{pct(w.attempts - w.misses, w.attempts)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </section>
+                </div>
+              </div>
             )}
 
             {error && <p className="error">{error}</p>}

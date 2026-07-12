@@ -33,8 +33,15 @@ export interface WordStat {
   last_seen: string | null;
 }
 
+export interface TypingStats {
+  drills: number;
+  avg_wpm: number;
+  best_wpm: number;
+}
+
 export interface StatsResponse {
   words: WordStat[];
+  typing: TypingStats;
 }
 
 export interface NewWord {

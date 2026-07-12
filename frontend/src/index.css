@@ -20,13 +20,13 @@ body {
   margin: 0;
 }
 
+/* The top padding is the only thing keeping a tall page from running under the
+   tab bar, which floats above it. */
 #root {
   position: relative;
   min-height: 100vh;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
+  padding: 88px 40px 48px;
 }
 
 /* Pinned to the top of the page instead of riding above the centered content.
@@ -41,10 +41,24 @@ body {
   gap: 24px;
 }
 
+/* Not really a card anymore, just the column the content lives in. The
+   max-width is what stops lines from running the full width of a big monitor,
+   which is miserable to read.
+
+   Centered by default, because while you're typing you want the sentence under
+   your eyes rather than off in a corner. Auto margins rather than
+   `align-items: center`, which clips the top of anything taller than the
+   viewport and leaves you no way to scroll up to it. */
 .card {
   width: 100%;
   max-width: 880px;
-  padding: 32px;
+  margin: auto;
+}
+
+/* Stats reads like a page, not a prompt, so it starts top-left and grows down. */
+.card-stats {
+  margin: 0;
+  align-self: flex-start;
 }
 
 .instruction {
@@ -158,6 +172,37 @@ button:hover {
 
 .new-word b {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Four short sections instead of one long table. The point of this tab is the
+   handful of words you actually get wrong, not a listing of the seed file. */
+.stats {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* Headings separate from body text by weight and size alone, not by dimming.
+   Every bit of text on this page stays pure white. */
+.stat-heading {
+  margin: 0 0 10px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.stat-line {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+/* The two lines above are summary numbers and these are the detail behind them.
+   Grouping the tables with real air above keeps them from reading as two more
+   rows of the same list. */
+.stat-tables {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  margin-top: 40px;
 }
 
 .stats-table {

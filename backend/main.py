@@ -65,8 +65,8 @@ def get_drills():
 
 @app.get("/stats")
 def get_stats():
-    """Everything the stats tab shows: per-word counters, worst first."""
-    return {"words": db.get_all_words()}
+    """Everything the stats tab shows: per-word counters plus typing speed."""
+    return {"words": db.get_all_words(), "typing": db.get_typing_stats()}
 
 
 @app.post("/results")
