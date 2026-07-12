@@ -48,6 +48,14 @@ def init_db() -> None:
                 correct   INTEGER NOT NULL,
                 timestamp TEXT NOT NULL DEFAULT (datetime('now'))
             );
+
+            CREATE TABLE IF NOT EXISTS drills (
+                id          INTEGER PRIMARY KEY,
+                sentence    TEXT NOT NULL,
+                typed       TEXT NOT NULL,
+                duration_ms INTEGER NOT NULL,
+                timestamp   TEXT NOT NULL DEFAULT (datetime('now'))
+            );
             """
         )
 
@@ -101,6 +109,30 @@ def get_mastered_sample(n: int = 2) -> list[str]:
     return [row["word"] for row in rows]
 
 
+def get_all_words() -> list[dict]:
+    """Every tracked word with its counters, worst first. Backs both the stats
+    endpoint and the markdown view, so the ordering only lives here."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT word, attempts, misses, streak, status, source, last_seen
+            FROM words
+            ORDER BY status, misses DESC, word
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def record_drill(sentence: str, typed: str, duration_ms: int) -> None:
+    """Log one timed sentence. Nothing reads this yet — it's the raw material
+    for words-per-minute, which can't be backfilled if we don't capture it now."""
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO drills (sentence, typed, duration_ms) VALUES (?, ?, ?)",
+            (sentence, typed, duration_ms),
+        )
+
+
 def record_result(word: str, typed: str, correct: bool) -> None:
     """Log a raw attempt and roll the word's stats forward."""
     word = word.strip().lower()
@@ -137,14 +169,7 @@ def record_result(word: str, typed: str, correct: bool) -> None:
 
 def render_markdown() -> None:
     """Rewrite weak_words.md from the DB — the human/agent-readable view."""
-    with _connect() as conn:
-        rows = conn.execute(
-            """
-            SELECT word, attempts, misses, streak, status, source, last_seen
-            FROM words
-            ORDER BY status, misses DESC, word
-            """
-        ).fetchall()
+    rows = get_all_words()
 
     lines = [
         "# Weak words",

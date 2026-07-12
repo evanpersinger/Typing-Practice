@@ -75,7 +75,7 @@ def generate_drills(words: list[str], count: int = 20) -> GeneratedDrills:
     )
     response = _get_client().messages.parse(
         model=MODEL,
-        max_tokens=600,
+        max_tokens=1000,
         messages=[
             {"role": "user", 
              "content": prompt}],

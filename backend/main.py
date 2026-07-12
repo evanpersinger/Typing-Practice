@@ -45,6 +45,7 @@ class WordResult(BaseModel):
 class DrillResult(BaseModel):
     sentence: str
     typed: str
+    duration_ms: int = 0
     words: list[WordResult]
 
 
@@ -62,11 +63,18 @@ def get_drills():
     return {"words": words, "drills": [d.model_dump() for d in generated.drills]}
 
 
+@app.get("/stats")
+def get_stats():
+    """Everything the stats tab shows: per-word counters, worst first."""
+    return {"words": db.get_all_words()}
+
+
 @app.post("/results")
 def submit_results(payload: ResultsPayload):
     """Session end: bookkeeping in code, pattern-finding via the agent."""
     misses: list[dict] = []
     for drill in payload.results:
+        db.record_drill(drill.sentence, drill.typed, drill.duration_ms)
         for word in drill.words:
             db.record_result(word.word, word.typed, word.correct)
             if not word.correct:

@@ -19,7 +19,22 @@ export interface WordResult {
 export interface DrillResult {
   sentence: string;
   typed: string;
+  duration_ms: number;
   words: WordResult[];
+}
+
+export interface WordStat {
+  word: string;
+  attempts: number;
+  misses: number;
+  streak: number;
+  status: string;
+  source: string;
+  last_seen: string | null;
+}
+
+export interface StatsResponse {
+  words: WordStat[];
 }
 
 export interface NewWord {
@@ -35,6 +50,12 @@ export interface AnalysisResponse {
 export async function fetchDrills(): Promise<DrillsResponse> {
   const res = await fetch(`${API_BASE}/drills`);
   if (!res.ok) throw new Error(`Failed to load drills (${res.status})`);
+  return res.json();
+}
+
+export async function fetchStats(): Promise<StatsResponse> {
+  const res = await fetch(`${API_BASE}/stats`);
+  if (!res.ok) throw new Error(`Failed to load stats (${res.status})`);
   return res.json();
 }
 
