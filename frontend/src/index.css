@@ -1,16 +1,15 @@
 :root {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: #000000;
+  color: #ffffff;
 
-  /* Texture comes from the image, tone comes from background-color. `multiply`
-     blends the near-white plaster down onto the base, so darken or brighten the
-     wall by changing the hex alone. The image never needs re-exporting. */
-  background-color: #e8e6de;
-  background-image: url("/paper-bg.jpg");
+  /* Dark plaster wall. The image carries its own vignette (darker at the edges,
+     lighter through the middle), which frames the content for free. The color
+     is only a fallback for the moment before the image lands. */
+  background-color: #2a2e2c;
+  background-image: url("/wall-bg.jpg");
   background-size: cover;
   background-position: center;
   background-attachment: fixed;
-  background-blend-mode: multiply;
 }
 
 * {
@@ -44,12 +43,12 @@ body {
 
 .card {
   width: 100%;
-  max-width: 640px;
+  max-width: 880px;
   padding: 32px;
 }
 
 .instruction {
-  font-size: 1.05rem;
+  font-size: 1.5rem;
   margin: 0 0 20px;
 }
 
@@ -61,14 +60,14 @@ body {
 }
 
 .progress {
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   margin: 0;
 }
 
 .timer {
   margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -77,9 +76,11 @@ body {
   font-weight: 600;
 }
 
+/* Prompt and input are deliberately the same size and face. You read one while
+   typing the other, so any mismatch makes them harder to compare. */
 .prompt {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 1.15rem;
+  font-size: 1.9rem;
   line-height: 1.6;
   margin-bottom: 16px;
 }
@@ -87,37 +88,37 @@ body {
 .typing-input {
   width: 100%;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 1.1rem;
-  padding: 12px 14px;
-  color: #000000;
-  background: #efece4;
-  border: 1px solid #cfc9ba;
+  font-size: 1.9rem;
+  padding: 16px 18px;
+  color: #ffffff;
+  background: #1e2220;
+  border: 1px solid #4a4f4c;
   border-radius: 8px;
   outline: none;
 }
 
-/* Left grey on purpose: a black placeholder reads as text you already typed. */
+/* Dimmed on purpose: a white placeholder reads as text you already typed. */
 .typing-input::placeholder {
-  color: #9a9384;
+  color: #7d827e;
 }
 
 .typing-input:focus {
-  border-color: #000000;
+  border-color: #ffffff;
 }
 
 .hint {
-  font-size: 0.8rem;
+  font-size: 1rem;
   margin-top: 10px;
 }
 
 /* Text buttons, not filled boxes. */
 button {
   font-family: inherit;
-  font-size: 1rem;
+  font-size: 1.3rem;
   padding: 0;
   border: none;
   background: none;
-  color: #000000;
+  color: #ffffff;
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 4px;
@@ -135,11 +136,11 @@ button:hover {
 
 .tab-active {
   font-weight: 600;
-  border-bottom-color: #000000;
+  border-bottom-color: #ffffff;
 }
 
 .error {
-  color: #b4342a;
+  color: #ff7a70;
   margin-top: 16px;
 }
 
@@ -162,19 +163,19 @@ button:hover {
 .stats-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 1.1rem;
 }
 
 .stats-table th {
   text-align: left;
   font-weight: 600;
   padding: 8px 12px 8px 0;
-  border-bottom: 1px solid #b9b3a4;
+  border-bottom: 1px solid #7d827e;
 }
 
 .stats-table td {
   padding: 8px 12px 8px 0;
-  border-bottom: 1px solid #d7d1c2;
+  border-bottom: 1px solid #3f4441;
 }
 
 .stat-word {
