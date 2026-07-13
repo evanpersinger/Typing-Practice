@@ -90,23 +90,19 @@ export default function App() {
   const [typed, setTyped] = useState<string[]>([]);
   const [durations, setDurations] = useState<number[]>([]);
   const [current, setCurrent] = useState("");
-  const [elapsed, setElapsed] = useState(0);
   const [results, setResults] = useState<WordResult[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Clock for the sentence on screen. It only ever counts time you spent
-  // actually typing: it starts on your first keystroke rather than on display,
-  // and it stops when you leave the tab. `banked` holds the time from earlier
-  // runs on this same sentence so pausing resumes instead of restarting.
+  // Clock for the sentence on screen. Nothing displays it any more, but it's
+  // still what wpm is computed from, so it has to stay honest: it counts only
+  // time you spent actually typing, starting on your first keystroke rather
+  // than on display, and stopping when you leave the tab. `banked` holds the
+  // time from earlier runs on this same sentence, so pausing resumes instead of
+  // restarting.
   const startedAt = useRef<number | null>(null);
   const banked = useRef(0);
-
-  function elapsedMs(): number {
-    const running = startedAt.current ? Date.now() - startedAt.current : 0;
-    return banked.current + running;
-  }
 
   function stopClock() {
     if (startedAt.current === null) return;
@@ -117,14 +113,7 @@ export default function App() {
   function resetClock() {
     startedAt.current = null;
     banked.current = 0;
-    setElapsed(0);
   }
-
-  useEffect(() => {
-    if (tab !== "practice" || phase !== "typing") return;
-    const id = setInterval(() => setElapsed(elapsedMs()), 100);
-    return () => clearInterval(id);
-  }, [tab, phase]);
 
   // Put the cursor back in the box on a new sentence and on returning from the
   // Stats tab, otherwise you come back mid-sentence and type into nothing.
@@ -314,11 +303,6 @@ export default function App() {
     .sort((a, b) => b.attempts - a.attempts || b.streak - a.streak)
     .slice(0, TOP_N);
 
-  // Under a second the sample is too small to mean anything, so hold at 0
-  // instead of flashing a 300 wpm reading off a single keystroke.
-  const liveWpm =
-    elapsed > 1000 ? Math.round(current.length / 5 / (elapsed / 60000)) : 0;
-
   // Stats and the start screen both sit at the top. Everything else stays
   // centered, so a sentence you're typing lands under your eyes. Loading holds
   // the start screen's position, since it's still the start screen on display.
@@ -333,8 +317,8 @@ export default function App() {
     return (
       <div className="card">
         <div className="profile-picker">
-          <button onClick={() => chooseProfile("personal")}>Personal</button>
           <button onClick={() => chooseProfile("testing")}>Testing</button>
+          <button onClick={() => chooseProfile("personal")}>Personal</button>
         </div>
       </div>
     );
@@ -355,34 +339,38 @@ export default function App() {
         >
           Stats
         </button>
-        {/* Always on screen, because a profile you can't see is a profile you
-            can forget you're in. Click it to go back to the picker. */}
-        <button className="tab profile-tab" onClick={switchProfile}>
-          {profile}
-        </button>
       </nav>
+
+      {/* Always on screen, because a profile you can't see is a profile you can
+          forget you're in. Click it to go back to the picker. */}
+      <button className="profile-chip" onClick={switchProfile}>
+        {profile}
+      </button>
 
       <div className={cardClass}>
         {tab === "practice" && (
           <>
-            {(phase === "idle" || phase === "loading") && (
+            {phase === "idle" && (
               <>
                 <p className="instruction">Click start to begin your session.</p>
-                <button onClick={startSession} disabled={phase === "loading"}>
+                <button className="start-session" onClick={startSession}>
                   Start session
                 </button>
                 {error && <p className="error">{error}</p>}
               </>
             )}
 
+            {/* Claude is writing your sentences, which takes a while. The
+                spinner is the only thing on screen that says so. */}
+            {phase === "loading" && (
+              <>
+                <p className="instruction">Starting session…</p>
+                <div className="spinner" />
+              </>
+            )}
+
             {phase === "typing" && drills[index] && (
               <>
-                <div className="drill-header">
-                  <p className="timer">
-                    {Math.floor(elapsed / 1000)}s
-                    <span className="timer-wpm">{liveWpm} wpm</span>
-                  </p>
-                </div>
                 <p className="prompt">{drills[index].sentence}</p>
                 <input
                   key={index}

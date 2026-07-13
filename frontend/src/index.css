@@ -70,29 +70,40 @@ body {
 }
 
 .instruction {
-  font-size: 1.5rem;
-  margin: 0 0 20px;
+  font-size: 2.4rem;
+  margin: 0 0 28px;
 }
 
-/* Nothing but the clock lives up here now. It sits right, out of the way of the
-   sentence, which is the only thing you should be looking at. */
-.drill-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  margin-bottom: 12px;
+/* The start screen is two lines and nothing else, so the button carries as much
+   weight as the sentence above it. Same outlined box as End session, one size up. */
+.start-session {
+  padding: 18px 40px;
+  font-size: 2rem;
+  border: 1px solid #ffffff;
+  border-radius: 10px;
+  text-decoration: none;
 }
 
-.timer {
-  margin: 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 1.1rem;
-  font-variant-numeric: tabular-nums;
+.start-session:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
 }
 
-.timer-wpm {
-  margin-left: 12px;
-  font-weight: 600;
+/* One white arc on an invisible ring, rather than a white circle over a gray
+   one. Same reason everything else here is pure white: no gray anywhere. */
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid transparent;
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Prompt and input are deliberately the same size and face. You read one while
@@ -142,19 +153,6 @@ button:hover {
   opacity: 0.55;
 }
 
-/* While the drills are being written the button is still there, still white,
-   just inert. The underline is the only thing that goes: it's what makes a
-   button look pressable, so dropping it reads as "not yet" without dimming any
-   text. */
-button:disabled {
-  cursor: default;
-  text-decoration: none;
-}
-
-button:disabled:hover {
-  opacity: 1;
-}
-
 .tab {
   padding: 2px 0;
   border-bottom: 2px solid transparent;
@@ -166,14 +164,23 @@ button:disabled:hover {
   border-bottom-color: #ffffff;
 }
 
-/* Not a tab, a label you can click. The border says "this is which world you're
-   in", which is a different kind of thing from Practice and Stats, so it reads
-   as a chip rather than a third destination. */
-.profile-tab {
-  padding: 2px 12px;
+/* Off in the corner, not in the tab bar: it isn't a third destination, it's a
+   badge saying which world you're in. Click it to go back to the picker. Lines
+   up with the tabs, and absolute like them so it scrolls away over a long stats
+   table instead of hovering on top of it. */
+.profile-chip {
+  position: absolute;
+  top: 28px;
+  right: 40px;
+  padding: 2px 14px;
   border: 1px solid #ffffff;
   border-radius: 999px;
   font-size: 1.1rem;
+  text-decoration: none;
+  /* The profile name is a wire value ("testing"), capitalized for display only.
+     Changing the value itself would mean changing the header the backend keys
+     off, for the sake of a capital letter. */
+  text-transform: capitalize;
 }
 
 /* The one screen where the buttons are the whole page, so they get to be real
@@ -187,15 +194,17 @@ button:disabled:hover {
   flex: 1;
   padding: 90px 24px;
   font-size: 3.6rem;
-  border: 1px solid #4a4f4c;
+  border: 1px solid #ffffff;
   border-radius: 12px;
-  background: #1e2220;
+  background: none;
   text-decoration: none;
 }
 
+/* A faint fill on hover rather than the usual fade, since fading a box this
+   size takes the whole button with it, text included. */
 .profile-picker button:hover {
   opacity: 1;
-  border-color: #ffffff;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .error {
@@ -224,11 +233,20 @@ button:disabled:hover {
 }
 
 /* Sits under the input as a way out, not an invitation. Small, so it never
-   competes with the sentence you're supposed to be reading. */
+   competes with the sentence you're supposed to be reading. Outlined like the
+   picker buttons: same fill-on-hover, no fade. */
 .end-session {
-  align-self: flex-start;
-  margin-top: 14px;
-  font-size: 1rem;
+  margin-top: 20px;
+  padding: 14px 32px;
+  font-size: 1.4rem;
+  border: 1px solid #ffffff;
+  border-radius: 8px;
+  text-decoration: none;
+}
+
+.end-session:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .new-word {
