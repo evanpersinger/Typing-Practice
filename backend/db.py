@@ -3,25 +3,71 @@
 This is the source of truth for word stats. `weak_words.md` is a human-readable
 view rendered from here, and the agent never does the arithmetic — the plain
 functions below own attempts / misses / streak / graduation.
+
+Everything here reads and writes whichever profile is active for the current
+request, so the practice loop never has to know there's more than one.
 """
 
 from __future__ import annotations
 
 import sqlite3
+from contextvars import ContextVar
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / "typing.db"
-MD_PATH = BASE_DIR / "weak_words.md"
-SESSIONS_DIR = BASE_DIR / "sessions"
 
 # Clean hits in a row before a word graduates from "drilling" to "mastered".
 MASTERY_STREAK = 10
 
 
+@dataclass(frozen=True)
+class Profile:
+    """One self-contained world: its own database, word list, and transcripts.
+
+    Separate *files* rather than a flag column on every row. A flag is only as
+    good as the WHERE clause you remember to write, and the one thing this
+    feature has to guarantee is that a throwaway session can never touch the
+    real numbers.
+    """
+
+    db: Path
+    markdown: Path
+    sessions: Path
+
+
+PROFILES: dict[str, Profile] = {
+    "personal": Profile(
+        db=BASE_DIR / "typing.db",
+        markdown=BASE_DIR / "weak_words.md",
+        sessions=BASE_DIR / "sessions",
+    ),
+    "testing": Profile(
+        db=BASE_DIR / "typing_test.db",
+        markdown=BASE_DIR / "weak_words_test.md",
+        sessions=BASE_DIR / "sessions_test",
+    ),
+}
+
+DEFAULT_PROFILE = "personal"
+
+_active: ContextVar[str] = ContextVar("profile", default=DEFAULT_PROFILE)
+
+
+def use_profile(name: str) -> None:
+    """Point every subsequent read and write at one profile."""
+    if name not in PROFILES:
+        raise ValueError(f"unknown profile: {name!r}")
+    _active.set(name)
+
+
+def active_profile() -> Profile:
+    return PROFILES[_active.get()]
+
+
 def _connect() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(active_profile().db)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -169,8 +215,8 @@ def record_drill(
         )
 
 
-def get_typing_stats() -> dict[str, int]:
-    """Words-per-minute across every timed drill.
+def get_typing_stats(session_id: int | None = None) -> dict[str, int]:
+    """Words-per-minute across timed drills, or just one session's worth.
 
     The average is total characters over total time, not the mean of the
     per-sentence rates. Averaging the rates would let a four-word sentence
@@ -178,6 +224,9 @@ def get_typing_stats() -> dict[str, int]:
 
     A "word" is five characters, the standard typing-test convention, so this
     stays comparable to any other wpm number you've seen.
+
+    The session filter is a WHERE clause rather than a second function, so the
+    number on the results screen can't drift from the one on the stats tab.
     """
     with _connect() as conn:
         row = conn.execute(
@@ -187,8 +236,11 @@ def get_typing_stats() -> dict[str, int]:
                    SUM(duration_ms)   AS total_ms,
                    MAX(LENGTH(typed) * 60000.0 / (5 * duration_ms)) AS best_wpm
             FROM drills
-            WHERE duration_ms > 0 AND LENGTH(typed) > 0
-            """
+            WHERE duration_ms > 0
+              AND LENGTH(typed) > 0
+              AND (? IS NULL OR session_id = ?)
+            """,
+            (session_id, session_id),
         ).fetchone()
 
     # A skipped sentence has no time and no text, so it's filtered out above.
@@ -246,7 +298,7 @@ def record_result(
 
 
 def render_markdown() -> None:
-    """Rewrite weak_words.md from the DB — the human/agent-readable view."""
+    """Rewrite the active profile's word list from the DB — the human-readable view."""
     rows = get_all_words()
 
     lines = [
@@ -261,7 +313,7 @@ def render_markdown() -> None:
             f"{row['streak']} | {row['status']} | {row['source']} | "
             f"{row['last_seen'] or '-'} |"
         )
-    MD_PATH.write_text("\n".join(lines) + "\n")
+    active_profile().markdown.write_text("\n".join(lines) + "\n")
 
 
 def write_session_transcript(
@@ -276,8 +328,9 @@ def write_session_transcript(
     gets its own timestamped file so the folder builds up a full history.
     """
     now = datetime.now()
-    SESSIONS_DIR.mkdir(exist_ok=True)
-    path = SESSIONS_DIR / f"{now:%Y-%m-%d_%H%M%S}.md"
+    sessions_dir = active_profile().sessions
+    sessions_dir.mkdir(exist_ok=True)
+    path = sessions_dir / f"{now:%Y-%m-%d_%H%M%S}.md"
 
     lines = [f"# Session {now:%Y-%m-%d %H:%M:%S}", ""]
     for i, drill in enumerate(drills, start=1):

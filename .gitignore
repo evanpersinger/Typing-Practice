@@ -3,8 +3,11 @@ __pycache__/
 *.pyc
 .env
 typing.db
+typing_test.db
 weak_words.md
+weak_words_test.md
 sessions/
+sessions_test/
 node_modules/
 dist/
 .claude/settings.local.json

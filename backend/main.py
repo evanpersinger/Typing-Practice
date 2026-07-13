@@ -6,8 +6,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -18,9 +19,13 @@ SEED_PATH = Path(__file__).resolve().parent.parent / "seed_words.txt"
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    db.init_db()
-    db.seed_from_file(SEED_PATH)
-    db.render_markdown()
+    # Both worlds get built at boot, so picking "testing" for the first time
+    # lands on a seeded word list instead of an empty one.
+    for name in db.PROFILES:
+        db.use_profile(name)
+        db.init_db()
+        db.seed_from_file(SEED_PATH)
+        db.render_markdown()
     yield
 
 
@@ -34,6 +39,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+async def use_profile(x_profile: Annotated[str, Header()] = db.DEFAULT_PROFILE) -> str:
+    """Bind this request to the profile the frontend picked on the way in.
+
+    Async on purpose: it has to run in the request's own context for the
+    contextvar to still be set by the time the endpoint reads it.
+    """
+    try:
+        db.use_profile(x_profile)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"unknown profile: {x_profile}")
+    return x_profile
+
+
+# Every endpoint takes this. There is no way to reach the database without
+# having said which world you're in.
+Profile = Annotated[str, Depends(use_profile)]
 
 
 class WordResult(BaseModel):
@@ -54,9 +77,11 @@ class ResultsPayload(BaseModel):
 
 
 @app.get("/drills")
-def get_drills():
+def get_drills(profile: Profile):
     """Session start: pick the weakest words and generate sentences for them."""
-    words = db.get_drilling_words(limit=10) + db.get_mastered_sample(2)
+    # Roughly one target per sentence. Cram more in and the generator has to
+    # double them up, which is what makes a practice sentence read like one.
+    words = db.get_drilling_words(limit=7) + db.get_mastered_sample(1)
     if not words:
         return {"words": [], "drills": []}
     generated = agent.generate_drills(words)
@@ -64,13 +89,13 @@ def get_drills():
 
 
 @app.get("/stats")
-def get_stats():
+def get_stats(profile: Profile):
     """Everything the stats tab shows: per-word counters plus typing speed."""
     return {"words": db.get_all_words(), "typing": db.get_typing_stats()}
 
 
 @app.post("/results")
-def submit_results(payload: ResultsPayload):
+def submit_results(payload: ResultsPayload, profile: Profile):
     """Session end: bookkeeping in code, pattern-finding via the agent."""
     # One POST is one sitting, so the session boundary is already here in the
     # request. Nothing has to infer it from timestamps later.
@@ -98,4 +123,5 @@ def submit_results(payload: ResultsPayload):
     return {
         "pattern_summary": analysis.pattern_summary,
         "new_words": [s.model_dump() for s in analysis.new_words],
+        "typing": db.get_typing_stats(session_id),
     }

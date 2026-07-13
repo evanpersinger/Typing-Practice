@@ -8,9 +8,11 @@ import {
 import {
   fetchDrills,
   fetchStats,
+  setProfile,
   submitResults,
   type AnalysisResponse,
   type Drill,
+  type Profile,
   type StatsResponse,
   type WordResult,
 } from "./api";
@@ -34,7 +36,53 @@ function pct(part: number, whole: number): string {
   return `${Math.round((part / whole) * 100)}%`;
 }
 
+interface WordRecap {
+  word: string;
+  attempts: number;
+  correct: number;
+  typos: string[];
+}
+
+/**
+ * Collapse a session's raw word results into one row per word. A word can come
+ * up in more than one sentence, so it can be both hit and missed in the same
+ * session, and the row has to say so rather than pick a side.
+ *
+ * The typos are the point of this table. Everywhere else in the app a miss is
+ * just a number; here it's the actual thing you wrote.
+ */
+function recapWords(results: WordResult[]): WordRecap[] {
+  const byWord = new Map<string, WordRecap>();
+
+  for (const result of results) {
+    const recap = byWord.get(result.word) ?? {
+      word: result.word,
+      attempts: 0,
+      correct: 0,
+      typos: [],
+    };
+    recap.attempts += 1;
+    if (result.correct) {
+      recap.correct += 1;
+    } else if (result.typed && !recap.typos.includes(result.typed)) {
+      recap.typos.push(result.typed);
+    }
+    byWord.set(result.word, recap);
+  }
+
+  // Worst first: the words you missed are why you're on this screen.
+  return [...byWord.values()].sort(
+    (a, b) =>
+      b.attempts - b.correct - (a.attempts - a.correct) ||
+      a.word.localeCompare(b.word),
+  );
+}
+
 export default function App() {
+  // Null until you've picked one, which is the whole point: there's no default
+  // to fall through, so nothing can be read or written before you've said which
+  // world you're in.
+  const [profile, setActiveProfile] = useState<Profile | null>(null);
   const [tab, setTab] = useState<Tab>("practice");
   const [phase, setPhase] = useState<Phase>("idle");
   const [drills, setDrills] = useState<Drill[]>([]);
@@ -86,6 +134,41 @@ export default function App() {
     if (tab === "practice" && phase === "typing") inputRef.current?.focus();
   }, [tab, phase, index]);
 
+  /** Wipe every trace of the last session. Whoever clears state, clears all of
+   *  it: a stale `results` or a running clock leaking into the next session is
+   *  the kind of bug you only notice in the numbers weeks later. */
+  function resetSession() {
+    setDrills([]);
+    setTyped([]);
+    setDurations([]);
+    setIndex(0);
+    setCurrent("");
+    setResults([]);
+    setAnalysis(null);
+    resetClock();
+  }
+
+  function chooseProfile(next: Profile) {
+    setProfile(next); // every request from here on carries this profile
+    setActiveProfile(next);
+    setTab("practice");
+    setPhase("idle");
+    setError(null);
+    setStats(null);
+    resetSession();
+  }
+
+  /** Back to the picker. Stats and session state are dropped on the way out, or
+   *  you'd be looking at one profile's numbers while typing into another's. */
+  function switchProfile() {
+    setActiveProfile(null);
+    setTab("practice");
+    setPhase("idle");
+    setError(null);
+    setStats(null);
+    resetSession();
+  }
+
   async function startSession() {
     setError(null);
     setPhase("loading");
@@ -96,14 +179,8 @@ export default function App() {
         setPhase("idle");
         return;
       }
+      resetSession();
       setDrills(data.drills);
-      setTyped([]);
-      setDurations([]);
-      setIndex(0);
-      setCurrent("");
-      setResults([]);
-      setAnalysis(null);
-      resetClock();
       setPhase("typing");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not reach the backend.");
@@ -111,8 +188,20 @@ export default function App() {
     }
   }
 
-  async function finishSession(allTyped: string[], allDurations: number[]) {
-    const perDrill = drills.map((drill, i) => {
+  /**
+   * Submit the finished sentences and show the results.
+   *
+   * `count` is how many sentences you actually pressed Enter on. It's the whole
+   * set on a normal run, and fewer when you end early. Only completed sentences
+   * are graded: a half-typed one isn't a misspelling, it's an interruption, and
+   * counting it would put a word back in rotation you never got to finish.
+   */
+  async function finishSession(
+    allTyped: string[],
+    allDurations: number[],
+    count: number,
+  ) {
+    const perDrill = drills.slice(0, count).map((drill, i) => {
       const typedText = allTyped[i] ?? "";
       return {
         sentence: drill.sentence,
@@ -145,6 +234,29 @@ export default function App() {
     }
   }
 
+  // Back to the start screen without spending a Claude call. "Practice again"
+  // used to be the only way off this screen, and it committed you to a whole
+  // new session just to leave.
+  function backToPractice() {
+    resetSession();
+    setPhase("idle");
+  }
+
+  /** Quit mid-session and keep the sentences you finished.
+   *
+   *  A sentence counts once you've pressed Enter on it, so `index` is exactly
+   *  how many are real. The one on screen and everything after it is dropped.
+   *  Quitting on the very first sentence means there's nothing to submit, so we
+   *  skip the round trip and the Claude call entirely. */
+  function endSession() {
+    stopClock();
+    if (index === 0) {
+      backToPractice();
+      return;
+    }
+    finishSession(typed, durations, index);
+  }
+
   function nextSentence() {
     const updatedTyped = [...typed];
     updatedTyped[index] = current;
@@ -158,7 +270,7 @@ export default function App() {
 
     setCurrent("");
     if (index + 1 >= drills.length) {
-      finishSession(updatedTyped, updatedDurations);
+      finishSession(updatedTyped, updatedDurations, drills.length);
     } else {
       setIndex(index + 1);
     }
@@ -177,6 +289,7 @@ export default function App() {
   }
 
   const correctCount = results.filter((r) => r.correct).length;
+  const recap = recapWords(results);
 
   // Only words you have actually typed. A seeded word you've never seen says
   // nothing about your spelling, and right now forty of the forty are seeds.
@@ -216,6 +329,17 @@ export default function App() {
         ? "card card-top"
         : "card";
 
+  if (profile === null) {
+    return (
+      <div className="card">
+        <div className="profile-picker">
+          <button onClick={() => chooseProfile("personal")}>Personal</button>
+          <button onClick={() => chooseProfile("testing")}>Testing</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <nav className="tabs">
@@ -230,6 +354,11 @@ export default function App() {
           onClick={openStats}
         >
           Stats
+        </button>
+        {/* Always on screen, because a profile you can't see is a profile you
+            can forget you're in. Click it to go back to the picker. */}
+        <button className="tab profile-tab" onClick={switchProfile}>
+          {profile}
         </button>
       </nav>
 
@@ -266,6 +395,9 @@ export default function App() {
                   autoCorrect="off"
                   spellCheck={false}
                 />
+                <button className="end-session" onClick={endSession}>
+                  End session
+                </button>
                 {error && <p className="error">{error}</p>}
               </>
             )}
@@ -274,25 +406,75 @@ export default function App() {
 
             {phase === "done" && analysis && (
               <div className="summary">
-                <p className="recap">
-                  You nailed {correctCount} of {results.length} target words.
-                </p>
-                <p>
-                  <b>Pattern:</b> {analysis.pattern_summary}
-                </p>
+                <h1 className="results-title">Session results</h1>
+
+                <section>
+                  <h2 className="stat-heading">overall</h2>
+                  <p className="stat-line">
+                    You spelled <b>{correctCount}</b> of {results.length} target
+                    words right · <b>{pct(correctCount, results.length)}</b>{" "}
+                    accuracy
+                  </p>
+                </section>
+
+                <section>
+                  <h2 className="stat-heading">speed</h2>
+                  <p className="stat-line">
+                    <b>{analysis.typing.avg_wpm}</b> wpm average ·{" "}
+                    <b>{analysis.typing.best_wpm}</b> wpm best sentence
+                  </p>
+                </section>
+
+                <section>
+                  <h2 className="stat-heading">words you practiced</h2>
+                  <table className="stats-table">
+                    <thead>
+                      <tr>
+                        <th>word</th>
+                        <th>right</th>
+                        <th>you typed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recap.map((w) => (
+                        <tr key={w.word}>
+                          <td className="stat-word">{w.word}</td>
+                          <td>
+                            {w.correct} of {w.attempts}
+                          </td>
+                          {/* A missed word with nothing typed is a sentence you
+                              cut short, which is worth seeing as its own thing
+                              rather than as a blank cell. */}
+                          <td className="stat-word">
+                            {w.correct === w.attempts
+                              ? "✓"
+                              : w.typos.length > 0
+                                ? w.typos.join(", ")
+                                : "nothing"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </section>
+
+                <section>
+                  <h2 className="stat-heading">pattern</h2>
+                  <p className="stat-line">{analysis.pattern_summary}</p>
+                </section>
+
                 {analysis.new_words.length > 0 && (
-                  <>
-                    <p>
-                      <b>Added to your list:</b>
-                    </p>
+                  <section>
+                    <h2 className="stat-heading">added to your list</h2>
                     {analysis.new_words.map((w) => (
                       <p key={w.word} className="new-word">
                         <b>{w.word}</b> {w.reason}
                       </p>
                     ))}
-                  </>
+                  </section>
                 )}
-                <button onClick={startSession}>Practice again</button>
+
+                <button onClick={backToPractice}>Back to practice</button>
               </div>
             )}
           </>

@@ -166,17 +166,69 @@ button:disabled:hover {
   border-bottom-color: #ffffff;
 }
 
+/* Not a tab, a label you can click. The border says "this is which world you're
+   in", which is a different kind of thing from Practice and Stats, so it reads
+   as a chip rather than a third destination. */
+.profile-tab {
+  padding: 2px 12px;
+  border: 1px solid #ffffff;
+  border-radius: 999px;
+  font-size: 1.1rem;
+}
+
+/* The one screen where the buttons are the whole page, so they get to be real
+   boxes rather than the text links used everywhere else. */
+.profile-picker {
+  display: flex;
+  gap: 24px;
+}
+
+.profile-picker button {
+  flex: 1;
+  padding: 90px 24px;
+  font-size: 3.6rem;
+  border: 1px solid #4a4f4c;
+  border-radius: 12px;
+  background: #1e2220;
+  text-decoration: none;
+}
+
+.profile-picker button:hover {
+  opacity: 1;
+  border-color: #ffffff;
+}
+
 .error {
   color: #ff7a70;
   margin-top: 16px;
 }
 
+/* The results screen borrows the stats tab's sections and tables wholesale, so
+   it only needs the spacing between them. */
 .summary {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
   line-height: 1.6;
 }
 
-.recap {
-  margin-bottom: 16px;
+/* Stretched by the flex column otherwise, which centers the label and makes a
+   text button look like a full-width bar. */
+.summary button {
+  align-self: flex-start;
+}
+
+.results-title {
+  margin: 0;
+  font-size: 2.4rem;
+}
+
+/* Sits under the input as a way out, not an invitation. Small, so it never
+   competes with the sentence you're supposed to be reading. */
+.end-session {
+  align-self: flex-start;
+  margin-top: 14px;
+  font-size: 1rem;
 }
 
 .new-word {
