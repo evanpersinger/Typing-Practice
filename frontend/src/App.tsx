@@ -206,6 +206,16 @@ export default function App() {
   const liveWpm =
     elapsed > 1000 ? Math.round(current.length / 5 / (elapsed / 60000)) : 0;
 
+  // Stats and the start screen both sit at the top. Everything else stays
+  // centered, so a sentence you're typing lands under your eyes. Loading holds
+  // the start screen's position, since it's still the start screen on display.
+  const cardClass =
+    tab === "stats"
+      ? "card card-stats"
+      : phase === "idle" || phase === "loading"
+        ? "card card-top"
+        : "card";
+
   return (
     <>
       <nav className="tabs">
@@ -223,25 +233,22 @@ export default function App() {
         </button>
       </nav>
 
-      <div className={tab === "stats" ? "card card-stats" : "card"}>
+      <div className={cardClass}>
         {tab === "practice" && (
           <>
-            {phase === "idle" && (
+            {(phase === "idle" || phase === "loading") && (
               <>
                 <p className="instruction">Click start to begin your session.</p>
-                <button onClick={startSession}>Start session</button>
+                <button onClick={startSession} disabled={phase === "loading"}>
+                  Start session
+                </button>
                 {error && <p className="error">{error}</p>}
               </>
             )}
 
-            {phase === "loading" && <p>Loading your drills…</p>}
-
             {phase === "typing" && drills[index] && (
               <>
                 <div className="drill-header">
-                  <p className="progress">
-                    Sentence {index + 1} of {drills.length}
-                  </p>
                   <p className="timer">
                     {Math.floor(elapsed / 1000)}s
                     <span className="timer-wpm">{liveWpm} wpm</span>
@@ -255,12 +262,10 @@ export default function App() {
                   value={current}
                   onChange={handleChange}
                   onKeyDown={handleKeyDown}
-                  placeholder="Type the sentence above…"
                   autoComplete="off"
                   autoCorrect="off"
                   spellCheck={false}
                 />
-                <p className="hint">Press Enter for the next sentence.</p>
                 {error && <p className="error">{error}</p>}
               </>
             )}

@@ -62,7 +62,7 @@ class Analysis(BaseModel):
 
 # session start: generate practice sentences
 
-def generate_drills(words: list[str], count: int = 20) -> GeneratedDrills:
+def generate_drills(words: list[str], count: int = 10) -> GeneratedDrills:
     joined = ", ".join(words)
     prompt = (
         f"Write {count} English typing-practice items of mixed length and form: "

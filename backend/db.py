@@ -41,12 +41,18 @@ def init_db() -> None:
                 last_seen TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS sessions (
+                id         INTEGER PRIMARY KEY,
+                started_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
             CREATE TABLE IF NOT EXISTS attempts (
-                id        INTEGER PRIMARY KEY,
-                word      TEXT NOT NULL,
-                typed     TEXT NOT NULL,
-                correct   INTEGER NOT NULL,
-                timestamp TEXT NOT NULL DEFAULT (datetime('now'))
+                id         INTEGER PRIMARY KEY,
+                word       TEXT NOT NULL,
+                typed      TEXT NOT NULL,
+                correct    INTEGER NOT NULL,
+                session_id INTEGER REFERENCES sessions(id),
+                timestamp  TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
             CREATE TABLE IF NOT EXISTS drills (
@@ -54,10 +60,32 @@ def init_db() -> None:
                 sentence    TEXT NOT NULL,
                 typed       TEXT NOT NULL,
                 duration_ms INTEGER NOT NULL,
+                session_id  INTEGER REFERENCES sessions(id),
                 timestamp   TEXT NOT NULL DEFAULT (datetime('now'))
             );
             """
         )
+        # Tables created before sessions existed keep their old shape, because
+        # CREATE TABLE IF NOT EXISTS won't alter them. Rows from back then stay
+        # NULL: those drills predate any notion of a session, and guessing at
+        # their boundaries from timestamps would invent history we don't have.
+        _add_column(conn, "attempts", "session_id INTEGER REFERENCES sessions(id)")
+        _add_column(conn, "drills", "session_id INTEGER REFERENCES sessions(id)")
+
+
+def _add_column(conn: sqlite3.Connection, table: str, declaration: str) -> None:
+    """Add a column to an existing table, no-op if it's already there."""
+    name = declaration.split()[0]
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if name not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {declaration}")
+
+
+def start_session() -> int:
+    """Open a session and return its id, to stamp on this sitting's rows."""
+    with _connect() as conn:
+        cursor = conn.execute("INSERT INTO sessions DEFAULT VALUES")
+        return int(cursor.lastrowid)
 
 
 def add_word(word: str, source: str = "seed") -> None:
@@ -123,13 +151,21 @@ def get_all_words() -> list[dict]:
     return [dict(row) for row in rows]
 
 
-def record_drill(sentence: str, typed: str, duration_ms: int) -> None:
+def record_drill(
+    sentence: str,
+    typed: str,
+    duration_ms: int,
+    session_id: int | None = None,
+) -> None:
     """Log one timed sentence. The raw material for words-per-minute, which
     can't be backfilled if we don't capture it as it happens."""
     with _connect() as conn:
         conn.execute(
-            "INSERT INTO drills (sentence, typed, duration_ms) VALUES (?, ?, ?)",
-            (sentence, typed, duration_ms),
+            """
+            INSERT INTO drills (sentence, typed, duration_ms, session_id)
+            VALUES (?, ?, ?, ?)
+            """,
+            (sentence, typed, duration_ms, session_id),
         )
 
 
@@ -167,14 +203,22 @@ def get_typing_stats() -> dict[str, int]:
     }
 
 
-def record_result(word: str, typed: str, correct: bool) -> None:
+def record_result(
+    word: str,
+    typed: str,
+    correct: bool,
+    session_id: int | None = None,
+) -> None:
     """Log a raw attempt and roll the word's stats forward."""
     word = word.strip().lower()
     today = date.today().isoformat()
     with _connect() as conn:
         conn.execute(
-            "INSERT INTO attempts (word, typed, correct) VALUES (?, ?, ?)",
-            (word, typed, int(correct)),
+            """
+            INSERT INTO attempts (word, typed, correct, session_id)
+            VALUES (?, ?, ?, ?)
+            """,
+            (word, typed, int(correct), session_id),
         )
         row = conn.execute("SELECT * FROM words WHERE word = ?", (word,)).fetchone()
         if row is None:

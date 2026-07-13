@@ -72,11 +72,15 @@ def get_stats():
 @app.post("/results")
 def submit_results(payload: ResultsPayload):
     """Session end: bookkeeping in code, pattern-finding via the agent."""
+    # One POST is one sitting, so the session boundary is already here in the
+    # request. Nothing has to infer it from timestamps later.
+    session_id = db.start_session()
+
     misses: list[dict] = []
     for drill in payload.results:
-        db.record_drill(drill.sentence, drill.typed, drill.duration_ms)
+        db.record_drill(drill.sentence, drill.typed, drill.duration_ms, session_id)
         for word in drill.words:
-            db.record_result(word.word, word.typed, word.correct)
+            db.record_result(word.word, word.typed, word.correct, session_id)
             if not word.correct:
                 misses.append({"word": word.word, "typed": word.typed})
 

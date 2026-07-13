@@ -61,21 +61,26 @@ body {
   align-self: flex-start;
 }
 
+/* The start screen is two short lines, and centering them leaves the button
+   floating in the middle of an empty page. Pinned to the top it reads as the
+   start of something instead. Still centered horizontally, unlike stats. */
+.card-top {
+  margin: 0 auto;
+  align-self: flex-start;
+}
+
 .instruction {
   font-size: 1.5rem;
   margin: 0 0 20px;
 }
 
+/* Nothing but the clock lives up here now. It sits right, out of the way of the
+   sentence, which is the only thing you should be looking at. */
 .drill-header {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-bottom: 12px;
-}
-
-.progress {
-  font-size: 1.1rem;
-  margin: 0;
 }
 
 .timer {
@@ -120,11 +125,6 @@ body {
   border-color: #ffffff;
 }
 
-.hint {
-  font-size: 1rem;
-  margin-top: 10px;
-}
-
 /* Text buttons, not filled boxes. */
 button {
   font-family: inherit;
@@ -140,6 +140,19 @@ button {
 
 button:hover {
   opacity: 0.55;
+}
+
+/* While the drills are being written the button is still there, still white,
+   just inert. The underline is the only thing that goes: it's what makes a
+   button look pressable, so dropping it reads as "not yet" without dimming any
+   text. */
+button:disabled {
+  cursor: default;
+  text-decoration: none;
+}
+
+button:disabled:hover {
+  opacity: 1;
 }
 
 .tab {
