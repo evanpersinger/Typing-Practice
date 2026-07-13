@@ -12,9 +12,15 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from backend import agent, db
+from backend import agent, db, fake_agent
 
 SEED_PATH = Path(__file__).resolve().parent.parent / "seed_words.txt"
+
+
+def agent_for(profile: str):
+    """Testing gets canned sentences and a canned analysis: same shapes, no
+    Claude, so a session starts instantly instead of after a 20-second wait."""
+    return fake_agent if profile == "testing" else agent
 
 
 @asynccontextmanager
@@ -78,7 +84,15 @@ class ResultsPayload(BaseModel):
 
 @app.get("/drills")
 def get_drills(profile: Profile):
-    """Session start: pick the weakest words and generate sentences for them."""
+    """Session start: pick the weakest words and generate sentences for them.
+
+    Testing skips the word list entirely. There's nothing to be weak at in a
+    profile you throw away, so it goes straight to the canned sentences.
+    """
+    if profile == "testing":
+        generated = fake_agent.generate_drills()
+        return {"words": [], "drills": [d.model_dump() for d in generated.drills]}
+
     # Roughly one target per sentence. Cram more in and the generator has to
     # double them up, which is what makes a practice sentence read like one.
     words = db.get_drilling_words(limit=7) + db.get_mastered_sample(1)
@@ -109,7 +123,7 @@ def submit_results(payload: ResultsPayload, profile: Profile):
             if not word.correct:
                 misses.append({"word": word.word, "typed": word.typed})
 
-    analysis = agent.analyze_session(misses)
+    analysis = agent_for(profile).analyze_session(misses)
 
     for suggestion in analysis.new_words:
         db.add_word(suggestion.word, source="agent")
