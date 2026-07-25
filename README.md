@@ -102,11 +102,12 @@ frontend/src/
   App.tsx        The whole UI: profile picker, practice, results, stats.
   api.ts         The three fetch calls, and the profile header.
   grade.ts       Aligns typed words to expected words and marks the targets.
-seed_words.txt          Example word list, committed. Seeds the testing profile.
-seed_words_personal.txt Your real word list, gitignored. Seeds the personal profile.
+seed_words.txt          Example word list, committed. Baseline for both profiles.
+seed_words_personal.txt Your real word list, gitignored. Layers on top, personal only.
 ```
 
-Both are loaded on boot, duplicates ignored.
+Loaded on boot, duplicates ignored. A fresh clone's personal profile isn't
+empty: it gets the example list until `seed_words_personal.txt` exists.
 
 ## Known rough edges
 

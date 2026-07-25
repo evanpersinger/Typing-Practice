@@ -1,7 +1,12 @@
+# Python
 .venv/
 __pycache__/
 *.pyc
+
+# Secrets
 .env
+
+# App data — personal profile, generated or local-only
 seed_words_personal.txt
 typing.db
 typing_test.db
@@ -9,7 +14,11 @@ weak_words.md
 weak_words_test.md
 sessions/
 sessions_test/
+
+# Frontend
 node_modules/
 dist/
+
+# Editor / tooling
 .claude/settings.local.json
 .vscode/
