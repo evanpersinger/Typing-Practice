@@ -164,7 +164,7 @@ export default function App() {
     try {
       const data = await fetchDrills();
       if (data.drills.length === 0) {
-        setError("No words to practice yet. Add some to seed_words.txt.");
+        setError("No words to practice yet. Add some to your seed word list.");
         setPhase("idle");
         return;
       }

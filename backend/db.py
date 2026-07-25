@@ -35,6 +35,7 @@ class Profile:
     db: Path
     markdown: Path
     sessions: Path
+    seeds: tuple[Path, ...]
 
 
 PROFILES: dict[str, Profile] = {
@@ -42,11 +43,16 @@ PROFILES: dict[str, Profile] = {
         db=BASE_DIR / "typing.db",
         markdown=BASE_DIR / "weak_words.md",
         sessions=BASE_DIR / "sessions",
+        # The committed example list first, so a fresh clone isn't empty, then
+        # your real list on top (not committed) if it exists. Dedup on insert
+        # means it doesn't matter if a word's in both.
+        seeds=(BASE_DIR / "seed_words.txt", BASE_DIR / "seed_words_personal.txt"),
     ),
     "testing": Profile(
         db=BASE_DIR / "typing_test.db",
         markdown=BASE_DIR / "weak_words_test.md",
         sessions=BASE_DIR / "sessions_test",
+        seeds=(BASE_DIR / "seed_words.txt",),
     ),
 }
 

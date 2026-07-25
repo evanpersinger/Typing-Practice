@@ -5,7 +5,6 @@ FastAPI app wiring the local trainer together.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -13,8 +12,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend import agent, db, fake_agent
-
-SEED_PATH = Path(__file__).resolve().parent.parent / "seed_words.txt"
 
 
 def agent_for(profile: str):
@@ -30,7 +27,8 @@ async def lifespan(app: FastAPI):
     for name in db.PROFILES:
         db.use_profile(name)
         db.init_db()
-        db.seed_from_file(SEED_PATH)
+        for path in db.active_profile().seeds:
+            db.seed_from_file(path)
         db.render_markdown()
     yield
 

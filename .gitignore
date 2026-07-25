@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 .env
+seed_words_personal.txt
 typing.db
 typing_test.db
 weak_words.md
