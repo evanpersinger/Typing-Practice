@@ -77,8 +77,8 @@ body {
 /* The start screen is two lines and nothing else, so the button carries as much
    weight as the sentence above it. Same outlined box as End session, one size up. */
 .start-session {
-  padding: 18px 40px;
-  font-size: 2rem;
+  padding: 24px 52px;
+  font-size: 2.4rem;
   border: 1px solid #ffffff;
   border-radius: 10px;
   text-decoration: none;
@@ -172,10 +172,10 @@ button:hover {
   position: absolute;
   top: 28px;
   right: 40px;
-  padding: 2px 14px;
+  padding: 8px 22px;
   border: 1px solid #ffffff;
   border-radius: 999px;
-  font-size: 1.1rem;
+  font-size: 1.6rem;
   text-decoration: none;
   /* The profile name is a wire value ("testing"), capitalized for display only.
      Changing the value itself would mean changing the header the backend keys

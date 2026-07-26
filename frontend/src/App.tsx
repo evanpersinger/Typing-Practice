@@ -352,7 +352,6 @@ export default function App() {
           <>
             {phase === "idle" && (
               <>
-                <p className="instruction">Click start to begin your session.</p>
                 <button className="start-session" onClick={startSession}>
                   Start session
                 </button>
