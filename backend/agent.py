@@ -26,7 +26,7 @@ claude-fable-5              Fable 5    - Claude 5 family
 claude-haiku-4-5-20251001   Haiku 4.5  - fastest, cheapest, lightest
 """
 
-MODEL = "claude-opus-4-8"
+MODEL = "claude-haiku-4-5-20251001"
 
 _client: Anthropic | None = None
 

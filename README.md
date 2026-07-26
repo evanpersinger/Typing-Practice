@@ -37,7 +37,7 @@ time you load the page. Nothing is remembered, on purpose.
 | database | `typing.db` | `typing_test.db` |
 | word list | `weak_words.md` | `weak_words_test.md` |
 | transcripts | `sessions/` | `sessions_test/` |
-| sentences | written by Claude, from your weak words | canned, fixed (`backend/fake_agent.py`) |
+| sentences | written by Claude, from your weak words | canned, fixed (`backend/test_agent.py`) |
 | analysis | Claude | canned |
 | session start | 10-30s | instant |
 
@@ -92,12 +92,22 @@ let a four-word sentence count as much as a long one.
 
 ## Layout
 
+- `backend/` — FastAPI server (port 8016). `main.py` wires up the routes, `db.py`
+  owns all storage and arithmetic, `agent.py`/`test_agent.py` own the Claude calls.
+  Nothing else in the app touches SQLite or Claude directly.
+- `frontend/` — React + Vite single-page app (port 5183). Fetches from the
+  backend over plain HTTP; no server-side rendering, no router, one page.
+- `sessions/` / `sessions_test/` — one markdown transcript per sitting, written
+  after every drill: prompt, what you typed, and the pattern Claude found.
+  A readable history, not just database rows. Gitignored, personal and testing
+  respectively.
+
 ```
 backend/
   main.py        FastAPI: /drills, /stats, /results. Picks the profile per request.
   db.py          All storage and all arithmetic. The agent never does math.
   agent.py       The two Claude calls: write sentences, find the pattern.
-  fake_agent.py  Same two functions, canned. Used by the testing profile.
+  test_agent.py  Same two functions, canned. Used by the testing profile.
 frontend/src/
   App.tsx        The whole UI: profile picker, practice, results, stats.
   api.ts         The three fetch calls, and the profile header.

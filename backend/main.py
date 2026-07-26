@@ -11,13 +11,13 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from backend import agent, db, fake_agent
+from backend import agent, db, test_agent
 
 
 def agent_for(profile: str):
     """Testing gets canned sentences and a canned analysis: same shapes, no
     Claude, so a session starts instantly instead of after a 20-second wait."""
-    return fake_agent if profile == "testing" else agent
+    return test_agent if profile == "testing" else agent
 
 
 @asynccontextmanager
@@ -88,7 +88,7 @@ def get_drills(profile: Profile):
     profile you throw away, so it goes straight to the canned sentences.
     """
     if profile == "testing":
-        generated = fake_agent.generate_drills()
+        generated = test_agent.generate_drills()
         return {"words": [], "drills": [d.model_dump() for d in generated.drills]}
 
     # Roughly one target per sentence. Cram more in and the generator has to
