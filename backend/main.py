@@ -35,11 +35,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="Typing Practice", lifespan=lifespan)
 
-# The Vite dev server runs on 5173 and calls this backend on 8000.
+# The Vite dev server runs on 5183 and calls this backend on 8016.
 # allows frontend to talk to the backend.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=["http://localhost:5183"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

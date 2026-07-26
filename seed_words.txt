@@ -13,3 +13,8 @@ itinerary
 available
 excellent
 experience
+velvet
+saddle
+jagged
+whisper
+thicket

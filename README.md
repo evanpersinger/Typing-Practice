@@ -9,14 +9,14 @@ times in a row graduate out. New words get added when Claude spots a weakness.
 
 ## Running it
 
-Backend (port 8000):
+Backend (port 8016):
 
 ```
 uv sync
-uv run uvicorn backend.main:app --reload
+uv run uvicorn backend.main:app --reload --port 8016
 ```
 
-Frontend (port 5173):
+Frontend (port 5183):
 
 ```
 cd frontend
@@ -24,7 +24,7 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:5173/. Needs `ANTHROPIC_API_KEY` in `.env` at the
+Then open http://localhost:5183/. Needs `ANTHROPIC_API_KEY` in `.env` at the
 repo root.
 
 ## Profiles
