@@ -7,26 +7,25 @@ import {
 } from "react";
 import {
   fetchDrills,
+  fetchSessionDetail,
+  fetchSessions,
   fetchStats,
   setProfile,
   submitResults,
   type AnalysisResponse,
   type Drill,
+  type NewWord,
   type Profile,
+  type SessionDetail,
+  type SessionSummary,
   type StatsResponse,
+  type TypingStats,
   type WordResult,
 } from "./api";
 import { gradeDrill } from "./grade";
 
 type Tab = "practice" | "stats";
 type Phase = "idle" | "loading" | "typing" | "submitting" | "done";
-
-// The stats tab is a highlight reel, not an inventory. Ten rows is enough to
-// show a pattern, and any more just buries it.
-const TOP_N = 10;
-
-// A word you get right four times out of five is one you can spell.
-const ACCURACY_FLOOR = 0.8;
 
 // Zero rather than a dash on an empty denominator: the stats tab always renders
 // its real shape, so you can see what the numbers will look like before you have
@@ -78,6 +77,109 @@ function recapWords(results: WordResult[]): WordRecap[] {
   );
 }
 
+// SQLite hands back UTC with a space instead of a "T", so "Z" is appended
+// before parsing rather than letting the browser read it as local time.
+function formatSessionDate(startedAt: string): string {
+  const date = new Date(`${startedAt.replace(" ", "T")}Z`);
+  return date.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+interface SessionRecapProps {
+  words: WordResult[];
+  typing: TypingStats;
+  patternSummary: string | null;
+  newWords: NewWord[];
+}
+
+/**
+ * The pattern/speed/word-table recap, shared between the screen you land on
+ * right after finishing a session and a past session pulled up from the
+ * Stats tab dropdown. Same shape either way, live results or fetched ones.
+ */
+function SessionRecap({
+  words,
+  typing,
+  patternSummary,
+  newWords,
+}: SessionRecapProps) {
+  const correctCount = words.filter((w) => w.correct).length;
+  const recap = recapWords(words);
+
+  return (
+    <>
+      <section>
+        <h2 className="stat-heading">overall</h2>
+        <p className="stat-line">
+          You spelled <b>{correctCount}</b> of {words.length} target words
+          right · <b>{pct(correctCount, words.length)}</b> accuracy
+        </p>
+      </section>
+
+      <section>
+        <h2 className="stat-heading">speed</h2>
+        <p className="stat-line">
+          <b>{typing.avg_wpm}</b> wpm average · <b>{typing.best_wpm}</b> wpm
+          best sentence
+        </p>
+      </section>
+
+      <section>
+        <h2 className="stat-heading">words you practiced</h2>
+        <table className="stats-table">
+          <thead>
+            <tr>
+              <th>word</th>
+              <th>right</th>
+              <th>you typed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recap.map((w) => (
+              <tr key={w.word}>
+                <td className="stat-word">{w.word}</td>
+                <td>
+                  {w.correct} of {w.attempts}
+                </td>
+                {/* A missed word with nothing typed is a sentence you
+                    cut short, which is worth seeing as its own thing
+                    rather than as a blank cell. */}
+                <td className="stat-word">
+                  {w.correct === w.attempts
+                    ? "✓"
+                    : w.typos.length > 0
+                      ? w.typos.join(", ")
+                      : "nothing"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      {patternSummary && (
+        <section>
+          <h2 className="stat-heading">pattern</h2>
+          <p className="stat-line">{patternSummary}</p>
+        </section>
+      )}
+
+      {newWords.length > 0 && (
+        <section>
+          <h2 className="stat-heading">added to your list</h2>
+          {newWords.map((w) => (
+            <p key={w.word} className="new-word">
+              <b>{w.word}</b> {w.reason}
+            </p>
+          ))}
+        </section>
+      )}
+    </>
+  );
+}
+
 export default function App() {
   // Null until you've picked one, which is the whole point: there's no default
   // to fall through, so nothing can be read or written before you've said which
@@ -93,6 +195,11 @@ export default function App() {
   const [results, setResults] = useState<WordResult[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<number | "">("");
+  const [sessionDetail, setSessionDetail] = useState<SessionDetail | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
 
   // Clock for the sentence on screen. Nothing displays it any more, but it's
@@ -144,6 +251,9 @@ export default function App() {
     setPhase("idle");
     setError(null);
     setStats(null);
+    setSessions(null);
+    setSelectedSessionId("");
+    setSessionDetail(null);
     resetSession();
   }
 
@@ -155,6 +265,9 @@ export default function App() {
     setPhase("idle");
     setError(null);
     setStats(null);
+    setSessions(null);
+    setSelectedSessionId("");
+    setSessionDetail(null);
     resetSession();
   }
 
@@ -216,10 +329,29 @@ export default function App() {
     setTab("stats");
     setError(null);
     try {
-      const data = await fetchStats();
-      setStats(data);
+      const [statsData, sessionsData] = await Promise.all([
+        fetchStats(),
+        fetchSessions(),
+      ]);
+      setStats(statsData);
+      setSessions(sessionsData);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load stats.");
+    }
+  }
+
+  /** Pull up one past session's recap. Clears the old one first so switching
+   *  sessions never shows stale data under the newly picked date while the
+   *  fetch is still in flight. */
+  async function selectSession(id: number | "") {
+    setSelectedSessionId(id);
+    setSessionDetail(null);
+    if (id === "") return;
+    try {
+      const detail = await fetchSessionDetail(id);
+      setSessionDetail(detail);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load that session.");
     }
   }
 
@@ -277,31 +409,17 @@ export default function App() {
     }
   }
 
-  const correctCount = results.filter((r) => r.correct).length;
-  const recap = recapWords(results);
-
   // Only words you have actually typed. A seeded word you've never seen says
   // nothing about your spelling, and right now forty of the forty are seeds.
   const drilled = stats?.words.filter((w) => w.attempts > 0) ?? [];
   const totalAttempts = drilled.reduce((sum, w) => sum + w.attempts, 0);
   const totalMisses = drilled.reduce((sum, w) => sum + w.misses, 0);
 
+  // Every word with at least one miss, worst first. No cap: this table is
+  // the one place the app tells you what to work on, not a highlight reel.
   const missed = drilled
     .filter((w) => w.misses > 0)
-    .sort((a, b) => b.misses - a.misses || b.attempts - a.attempts)
-    .slice(0, TOP_N);
-
-  // Anything already named above is excluded, so no word lands in both lists.
-  // The floor rather than a strict zero-miss rule: one bad day two months ago
-  // shouldn't disqualify a word you now get right every single time.
-  const flagged = new Set(missed.map((w) => w.word));
-  const solid = drilled
-    .filter(
-      (w) =>
-        !flagged.has(w.word) && 1 - w.misses / w.attempts >= ACCURACY_FLOOR,
-    )
-    .sort((a, b) => b.attempts - a.attempts || b.streak - a.streak)
-    .slice(0, TOP_N);
+    .sort((a, b) => b.misses - a.misses || b.attempts - a.attempts);
 
   // Stats and the start screen both sit at the top. Everything else stays
   // centered, so a sentence you're typing lands under your eyes. Loading holds
@@ -394,73 +512,12 @@ export default function App() {
             {phase === "done" && analysis && (
               <div className="summary">
                 <h1 className="results-title">Session results</h1>
-
-                <section>
-                  <h2 className="stat-heading">overall</h2>
-                  <p className="stat-line">
-                    You spelled <b>{correctCount}</b> of {results.length} target
-                    words right · <b>{pct(correctCount, results.length)}</b>{" "}
-                    accuracy
-                  </p>
-                </section>
-
-                <section>
-                  <h2 className="stat-heading">speed</h2>
-                  <p className="stat-line">
-                    <b>{analysis.typing.avg_wpm}</b> wpm average ·{" "}
-                    <b>{analysis.typing.best_wpm}</b> wpm best sentence
-                  </p>
-                </section>
-
-                <section>
-                  <h2 className="stat-heading">words you practiced</h2>
-                  <table className="stats-table">
-                    <thead>
-                      <tr>
-                        <th>word</th>
-                        <th>right</th>
-                        <th>you typed</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recap.map((w) => (
-                        <tr key={w.word}>
-                          <td className="stat-word">{w.word}</td>
-                          <td>
-                            {w.correct} of {w.attempts}
-                          </td>
-                          {/* A missed word with nothing typed is a sentence you
-                              cut short, which is worth seeing as its own thing
-                              rather than as a blank cell. */}
-                          <td className="stat-word">
-                            {w.correct === w.attempts
-                              ? "✓"
-                              : w.typos.length > 0
-                                ? w.typos.join(", ")
-                                : "nothing"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </section>
-
-                <section>
-                  <h2 className="stat-heading">pattern</h2>
-                  <p className="stat-line">{analysis.pattern_summary}</p>
-                </section>
-
-                {analysis.new_words.length > 0 && (
-                  <section>
-                    <h2 className="stat-heading">added to your list</h2>
-                    {analysis.new_words.map((w) => (
-                      <p key={w.word} className="new-word">
-                        <b>{w.word}</b> {w.reason}
-                      </p>
-                    ))}
-                  </section>
-                )}
-
+                <SessionRecap
+                  words={results}
+                  typing={analysis.typing}
+                  patternSummary={analysis.pattern_summary}
+                  newWords={analysis.new_words}
+                />
                 <button onClick={backToPractice}>Back to practice</button>
               </div>
             )}
@@ -473,72 +530,80 @@ export default function App() {
 
             {stats && (
               <div className="stats">
-                <section>
-                  <h2 className="stat-heading">typing speed</h2>
-                  <p className="stat-line">
-                    <b>{stats.typing.avg_wpm}</b> wpm average ·{" "}
-                    <b>{stats.typing.best_wpm}</b> wpm best ·{" "}
-                    {stats.typing.drills} sentences timed
-                  </p>
+                <section className="stat-columns">
+                  <div className="stat-column">
+                    <span className="stat-value">
+                      {pct(totalAttempts - totalMisses, totalAttempts)}
+                    </span>
+                    <span className="stat-label">accuracy</span>
+                  </div>
+                  <div className="stat-column">
+                    <span className="stat-value">{stats.typing.avg_wpm}</span>
+                    <span className="stat-label">avg wpm</span>
+                  </div>
+                  <div className="stat-column">
+                    <span className="stat-value">{stats.typing.best_wpm}</span>
+                    <span className="stat-label">best wpm</span>
+                  </div>
                 </section>
 
                 <section>
-                  <h2 className="stat-heading">mistakes</h2>
-                  <p className="stat-line">
-                    <b>{totalMisses}</b> misses across {totalAttempts} attempts ·{" "}
-                    <b>{pct(totalMisses, totalAttempts)}</b> miss rate
-                  </p>
+                  <h2 className="stat-heading">words you struggle with</h2>
+                  <table className="stats-table">
+                    <thead>
+                      <tr>
+                        <th>word</th>
+                        <th>missed</th>
+                        <th>attempts</th>
+                        <th>miss rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {missed.map((w) => (
+                        <tr key={w.word}>
+                          <td className="stat-word">{w.word}</td>
+                          <td>{w.misses}</td>
+                          <td>{w.attempts}</td>
+                          <td>{pct(w.misses, w.attempts)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </section>
 
-                <div className="stat-tables">
-                  <section>
-                    <h2 className="stat-heading">commonly misspelled</h2>
-                    <table className="stats-table">
-                      <thead>
-                        <tr>
-                          <th>word</th>
-                          <th>missed</th>
-                          <th>attempts</th>
-                          <th>miss rate</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {missed.map((w) => (
-                          <tr key={w.word}>
-                            <td className="stat-word">{w.word}</td>
-                            <td>{w.misses}</td>
-                            <td>{w.attempts}</td>
-                            <td>{pct(w.misses, w.attempts)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </section>
+                <section>
+                  <h2 className="stat-heading">sessions</h2>
+                  <select
+                    className="session-select"
+                    value={selectedSessionId}
+                    onChange={(e) =>
+                      selectSession(
+                        e.target.value === "" ? "" : Number(e.target.value),
+                      )
+                    }
+                  >
+                    <option value="">Select a session…</option>
+                    {sessions?.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {formatSessionDate(s.started_at)}
+                      </option>
+                    ))}
+                  </select>
 
-                  <section>
-                    <h2 className="stat-heading">spelled correctly often</h2>
-                    <table className="stats-table">
-                      <thead>
-                        <tr>
-                          <th>word</th>
-                          <th>correct</th>
-                          <th>attempts</th>
-                          <th>accuracy</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {solid.map((w) => (
-                          <tr key={w.word}>
-                            <td className="stat-word">{w.word}</td>
-                            <td>{w.attempts - w.misses}</td>
-                            <td>{w.attempts}</td>
-                            <td>{pct(w.attempts - w.misses, w.attempts)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </section>
-                </div>
+                  {selectedSessionId !== "" &&
+                    (sessionDetail && sessionDetail.id === selectedSessionId ? (
+                      <div className="summary session-gap">
+                        <SessionRecap
+                          words={sessionDetail.words}
+                          typing={sessionDetail.typing}
+                          patternSummary={sessionDetail.pattern_summary}
+                          newWords={sessionDetail.new_words}
+                        />
+                      </div>
+                    ) : (
+                      <p className="session-gap">Loading session…</p>
+                    ))}
+                </section>
               </div>
             )}
 

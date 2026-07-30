@@ -278,16 +278,6 @@ button:hover {
   font-size: 1.4rem;
 }
 
-/* The two lines above are summary numbers and these are the detail behind them.
-   Grouping the tables with real air above keeps them from reading as two more
-   rows of the same list. */
-.stat-tables {
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-  margin-top: 40px;
-}
-
 .stats-table {
   width: 100%;
   border-collapse: collapse;
@@ -308,4 +298,45 @@ button:hover {
 
 .stat-word {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.stat-columns {
+  display: flex;
+  gap: 48px;
+}
+
+.stat-column {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-value {
+  font-size: 2rem;
+  font-weight: 600;
+}
+
+.stat-label {
+  font-size: 1.1rem;
+}
+
+/* Matches .typing-input's look, so the dropdown reads as part of the same UI
+   instead of an unstyled browser control dropped in. */
+.session-select {
+  font-family: inherit;
+  font-size: 1.3rem;
+  color: #ffffff;
+  background: #1e2220;
+  border: 1px solid #4a4f4c;
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.session-select:focus {
+  outline: none;
+  border-color: #ffffff;
+}
+
+.session-gap {
+  margin-top: 28px;
 }

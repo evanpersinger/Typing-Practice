@@ -74,6 +74,20 @@ export interface AnalysisResponse {
   typing: TypingStats;
 }
 
+export interface SessionSummary {
+  id: number;
+  started_at: string;
+}
+
+export interface SessionDetail {
+  id: number;
+  started_at: string;
+  pattern_summary: string | null;
+  words: WordResult[];
+  new_words: NewWord[];
+  typing: TypingStats;
+}
+
 export async function fetchDrills(): Promise<DrillsResponse> {
   const res = await fetch(`${API_BASE}/drills`, { headers: headers() });
   if (!res.ok) throw new Error(`Failed to load drills (${res.status})`);
@@ -83,6 +97,19 @@ export async function fetchDrills(): Promise<DrillsResponse> {
 export async function fetchStats(): Promise<StatsResponse> {
   const res = await fetch(`${API_BASE}/stats`, { headers: headers() });
   if (!res.ok) throw new Error(`Failed to load stats (${res.status})`);
+  return res.json();
+}
+
+export async function fetchSessions(): Promise<SessionSummary[]> {
+  const res = await fetch(`${API_BASE}/sessions`, { headers: headers() });
+  if (!res.ok) throw new Error(`Failed to load sessions (${res.status})`);
+  const data = await res.json();
+  return data.sessions;
+}
+
+export async function fetchSessionDetail(id: number): Promise<SessionDetail> {
+  const res = await fetch(`${API_BASE}/sessions/${id}`, { headers: headers() });
+  if (!res.ok) throw new Error(`Failed to load that session (${res.status})`);
   return res.json();
 }
 

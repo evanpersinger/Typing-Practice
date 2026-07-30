@@ -127,6 +127,11 @@ def submit_results(payload: ResultsPayload, profile: Profile):
         db.add_word(suggestion.word, source="agent")
 
     db.render_markdown()
+    db.finish_session(
+        session_id,
+        analysis.pattern_summary,
+        [s.model_dump() for s in analysis.new_words],
+    )
     db.write_session_transcript(
         [d.model_dump() for d in payload.results],
         analysis.pattern_summary,
@@ -137,3 +142,18 @@ def submit_results(payload: ResultsPayload, profile: Profile):
         "new_words": [s.model_dump() for s in analysis.new_words],
         "typing": db.get_typing_stats(session_id),
     }
+
+
+@app.get("/sessions")
+def list_sessions(profile: Profile):
+    """Every past session, most recent first, for the Stats tab dropdown."""
+    return {"sessions": db.list_sessions()}
+
+
+@app.get("/sessions/{session_id}")
+def get_session(session_id: int, profile: Profile):
+    """One past session's full recap, same shape the results screen shows live."""
+    detail = db.get_session_detail(session_id)
+    if detail is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    return detail

@@ -94,8 +94,16 @@ def init_db() -> None:
             );
 
             CREATE TABLE IF NOT EXISTS sessions (
+                id              INTEGER PRIMARY KEY,
+                started_at      TEXT NOT NULL DEFAULT (datetime('now')),
+                pattern_summary TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS session_new_words (
                 id         INTEGER PRIMARY KEY,
-                started_at TEXT NOT NULL DEFAULT (datetime('now'))
+                session_id INTEGER NOT NULL REFERENCES sessions(id),
+                word       TEXT NOT NULL,
+                reason     TEXT NOT NULL
             );
 
             CREATE TABLE IF NOT EXISTS attempts (
@@ -123,6 +131,7 @@ def init_db() -> None:
         # their boundaries from timestamps would invent history we don't have.
         _add_column(conn, "attempts", "session_id INTEGER REFERENCES sessions(id)")
         _add_column(conn, "drills", "session_id INTEGER REFERENCES sessions(id)")
+        _add_column(conn, "sessions", "pattern_summary TEXT")
 
 
 def _add_column(conn: sqlite3.Connection, table: str, declaration: str) -> None:
@@ -362,3 +371,66 @@ def write_session_transcript(
 
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return path
+
+
+def finish_session(session_id: int, pattern_summary: str, new_words: list[dict]) -> None:
+    """Persist the agent's read on a session once it's done, so a past session
+    can show the same pattern and additions the results screen showed live."""
+    with _connect() as conn:
+        conn.execute(
+            "UPDATE sessions SET pattern_summary = ? WHERE id = ?",
+            (pattern_summary, session_id),
+        )
+        for w in new_words:
+            conn.execute(
+                "INSERT INTO session_new_words (session_id, word, reason) VALUES (?, ?, ?)",
+                (session_id, w["word"], w["reason"]),
+            )
+
+
+def list_sessions() -> list[dict]:
+    """Every session that produced at least one attempt, most recent first.
+    A session opened and quit on the first sentence has nothing to show, so
+    it's excluded rather than showing up as an empty row in the dropdown."""
+    with _connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT DISTINCT s.id, s.started_at
+            FROM sessions s
+            JOIN attempts a ON a.session_id = s.id
+            ORDER BY s.started_at DESC
+            """
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_session_detail(session_id: int) -> dict | None:
+    """The full recap for one past session, reconstructed from the DB in the
+    same shape the results screen already renders live after finishing."""
+    with _connect() as conn:
+        session = conn.execute(
+            "SELECT id, started_at, pattern_summary FROM sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+        if session is None:
+            return None
+        words = conn.execute(
+            "SELECT word, typed, correct FROM attempts WHERE session_id = ? ORDER BY id",
+            (session_id,),
+        ).fetchall()
+        new_words = conn.execute(
+            "SELECT word, reason FROM session_new_words WHERE session_id = ? ORDER BY id",
+            (session_id,),
+        ).fetchall()
+
+    return {
+        "id": session["id"],
+        "started_at": session["started_at"],
+        "pattern_summary": session["pattern_summary"],
+        "words": [
+            {"word": w["word"], "typed": w["typed"], "correct": bool(w["correct"])}
+            for w in words
+        ],
+        "new_words": [dict(w) for w in new_words],
+        "typing": get_typing_stats(session_id),
+    }
