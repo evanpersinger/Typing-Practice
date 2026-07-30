@@ -20,8 +20,8 @@ Frontend (port 5183):
 
 ```
 cd frontend
-npm install
-npm run dev
+pnpm install
+pnpm run dev
 ```
 
 Then open http://localhost:5183/. Needs `ANTHROPIC_API_KEY` in `.env` at the
