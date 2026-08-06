@@ -50,13 +50,16 @@ const TABLE =
   "[&_th]:border-b [&_th]:border-[#7d827e] [&_th]:py-2 [&_th]:pr-3 [&_th]:pl-0 [&_th]:text-left [&_th]:font-semibold " +
   "[&_td]:border-b [&_td]:border-[#3f4441] [&_td]:py-2 [&_td]:pr-3 [&_td]:pl-0";
 
-// The Words grid is a fixed board: 6 across (matching index.css) by 10 down,
-// the same 60 boxes whatever the word count. Filled boxes are what you're
-// working on, empty ones are the room left, so the shape of the grid tells you
-// how big your backlog is without counting anything.
+// A fixed 6-by-10 board: the same 60 cells whatever the word count, so the
+// empty ones show how much room is left.
 const WORD_COLUMNS = 6;
 const WORD_ROWS = 10;
 const WORD_SLOTS = WORD_COLUMNS * WORD_ROWS;
+
+// Six 173px columns, each fitting a 14-character word. Needs an explicit width
+// (table-fixed is ignored when width is auto) and shrink-0 (otherwise the flex
+// row squeezes the board and clips words).
+const WORD_TABLE_WIDTH = "w-[1095px] shrink-0";
 type Phase = "idle" | "loading" | "typing" | "submitting" | "done";
 
 // Zero rather than a dash on an empty denominator: the stats tab always renders
@@ -507,7 +510,14 @@ export default function App() {
   // words renders empty, which is what makes "47 words, 13 to spare" readable at
   // a glance. Past 60 the extra words aren't shown — the board is the board.
   const shownWeak = weak.slice(0, WORD_SLOTS);
-  const emptyCells = WORD_SLOTS - shownWeak.length;
+
+  // Row-major, padded with null so the board stays 6 by 10 even with two words.
+  const wordRows = Array.from({ length: WORD_ROWS }, (_, row) =>
+    Array.from(
+      { length: WORD_COLUMNS },
+      (_, col) => shownWeak[row * WORD_COLUMNS + col] ?? null,
+    ),
+  );
 
 
   // The list screens and the start screen sit at the top. Everything else stays
@@ -515,10 +525,10 @@ export default function App() {
   // the start screen's position, since it's still the start screen on display.
   const cardClass =
     tab === "words"
-      ? // Pulled hard into the top-left corner, out of #root's padding (which is
-        // only there to clear the floating tab bar), and wider than the 880px
-        // reading column since this is a six-across grid, not prose.
-        "w-full max-w-[1280px] self-start -mt-10 -ml-4"
+      ? // Pulled into the top-left corner, out of #root's padding. Uncapped
+        // unlike every other screen, so the add-a-word panel can sit far right
+        // instead of being stranded mid-window by a reading-width cap.
+        "w-full self-start -mt-10 -ml-4"
       : tab === "stats"
         ? // Stats reads like a page, not a prompt, so it starts top-left.
           "m-0 w-full max-w-[880px] self-start"
@@ -778,39 +788,47 @@ export default function App() {
               <div>
                 <section>
                   <h2 className="mt-0 mb-2 text-[1.8rem] font-semibold">
-                    Weak Words
+                    Weak Words{" "}
+                    <span className="font-mono">
+                      ({weak.length}/{WORD_SLOTS})
+                    </span>
                   </h2>
                   <p className="mt-0 mb-6 text-[1.3rem]">
                     these are words you need to practice
                   </p>
 
-                  {/* Grid left, add-a-word right. items-start keeps the panel
-                      at the top rather than stretching down ten rows. */}
-                  <div className="flex items-start gap-8">
-                    <ul className="grid min-w-0 flex-1 list-none grid-cols-6 gap-2 p-0 text-[1.1rem]">
-                      {shownWeak.map((w) => (
-                        <li
-                          key={w.word}
-                          className="rounded-md border border-white px-3.5 py-2.5 font-mono [overflow-wrap:anywhere]"
-                        >
-                          {w.word}
-                        </li>
-                      ))}
-                      {/* Empty slots. The non-breaking space is what gives them
-                          the same height as a box with a word in it. Hidden from
-                          screen readers, since "blank, blank, blank" is noise. */}
-                      {Array.from({ length: emptyCells }, (_, i) => (
-                        <li
-                          key={`empty-${i}`}
-                          className="rounded-md border border-[#4a4f4c] px-3.5 py-2.5 font-mono"
-                          aria-hidden="true"
-                        >
-                          {" "}
-                        </li>
-                      ))}
-                    </ul>
+                  {/* ml-auto on the panel pins it to this row's right edge, so
+                      mr here is what walks it back toward the middle. */}
+                  <div className="mr-24 flex items-start gap-12">
+                    {/* border-separate keeps each cell its own rounded box
+                        instead of collapsing into shared grid lines. */}
+                    <table
+                      className={`${WORD_TABLE_WIDTH} table-fixed border-separate border-spacing-2 font-mono text-[1.15rem]`}
+                    >
+                      <tbody>
+                        {wordRows.map((row, rowIndex) => (
+                          <tr key={rowIndex}>
+                            {row.map((entry, colIndex) => (
+                              <td
+                                key={colIndex}
+                                className="rounded-md border border-white px-2 py-3 text-center whitespace-nowrap"
+                                aria-hidden={entry ? undefined : "true"}
+                              >
+                                {entry ? entry.word : " "}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
 
-                    <div className="shrink-0 grow-0 basis-[220px]">
+                    {/* w-max: the heading is nowrap, so it sets the panel's
+                        width and the panel follows when you resize it. */}
+                    <div className="ml-auto w-max shrink-0 grow-0">
+                      <p className="mt-0 mb-2.5 text-[1.9rem] whitespace-nowrap">
+                        Add words you want to practice
+                      </p>
+
                       {/* A form, so Enter submits without a key handler. */}
                       <form
                         className="flex flex-col gap-2.5"
@@ -820,7 +838,7 @@ export default function App() {
                         }}
                       >
                         <input
-                          className="w-full rounded-md border border-[#4a4f4c] bg-[#1e2220] px-3.5 py-2.5 font-mono text-[1.1rem] text-white outline-none placeholder:text-[#7d827e] focus:border-white"
+                          className="w-full rounded-md border border-[#4a4f4c] bg-[#1e2220] px-5 py-3 font-mono text-[1.4rem] text-white outline-none placeholder:text-[#7d827e] focus:border-white"
                           value={newWord}
                           onChange={(e) => setNewWord(e.target.value)}
                           placeholder="add a word"
@@ -830,14 +848,14 @@ export default function App() {
                         />
                         <button
                           type="submit"
-                          className="cursor-pointer rounded-md border border-white px-6 py-2.5 text-[1.1rem] text-white no-underline hover:bg-white/8"
+                          className="cursor-pointer rounded-md border border-white px-6 py-3 text-[1.9rem] text-white no-underline hover:bg-white/8"
                         >
                           Add
                         </button>
                       </form>
 
                       {wordNote && (
-                        <p className="mt-0 mb-4 text-[1.1rem]">{wordNote}</p>
+                        <p className="mt-0 mb-4 text-[1.3rem]">{wordNote}</p>
                       )}
                     </div>
                   </div>
