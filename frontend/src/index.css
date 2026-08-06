@@ -311,6 +311,25 @@ button:hover {
 .card-words {
   margin: -40px 0 0 -16px;
   align-self: flex-start;
+  /* Wider than the 880px reading column. That cap exists to stop sentences
+     running the width of a monitor; this tab is a six-across grid with a panel
+     beside it, so the same cap just squeezes the columns. */
+  max-width: 1280px;
+}
+
+/* Grid on the left, add-a-word on the right. flex-start so the panel sits at
+   the top rather than stretching down a forty-row list. */
+.words-body {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+}
+
+/* The grid (or the empty-state line standing in for it) takes the room left
+   over. min-width: 0 lets it shrink instead of shoving the panel off-screen. */
+.words-body > :first-child {
+  flex: 1;
+  min-width: 0;
 }
 
 .words-heading {
@@ -327,16 +346,82 @@ button:hover {
   font-size: 1.3rem;
 }
 
-/* Columns rather than one tall list: a rotation runs to forty-odd words, and a
-   single column makes you scroll for a list you're meant to take in at a glance.
-   The monospace face comes from .stat-word on each item, same as every other
-   word in the app. */
+/* Fixed width, and it never shrinks — the grid beside it absorbs the slack. */
+.word-add-panel {
+  flex: 0 0 220px;
+}
+
+/* Stacked rather than side by side: it lives in a narrow right-hand panel now,
+   where an input and a button in a row would leave room for neither. */
+.word-add {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Same look as .typing-input and .session-select, so the box reads as part of
+   the app rather than a raw browser control. */
+.word-input {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.1rem;
+  padding: 10px 14px;
+  color: #ffffff;
+  background: #1e2220;
+  border: 1px solid #4a4f4c;
+  border-radius: 6px;
+  outline: none;
+}
+
+/* Dimmed for the same reason .typing-input's is: a white placeholder reads as
+   a word you already typed. */
+.word-input::placeholder {
+  color: #7d827e;
+}
+
+.word-input:focus {
+  border-color: #ffffff;
+}
+
+/* Outlined like End session, and matched to the input's height so the pair
+   reads as one control. */
+.word-add-button {
+  padding: 10px 24px;
+  font-size: 1.1rem;
+  border: 1px solid #ffffff;
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.word-add-button:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* The outcome of the last add. White like everything else — it's a receipt,
+   not a warning; real failures go through .error. */
+.word-note-line {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+}
+
+/* An unfilled slot. Same box, dimmer outline, so filled and empty are telling
+   apart at a glance without counting. The border dims, never the text — there
+   isn't any text in here to dim. */
+.word-list li.word-empty {
+  border-color: #4a4f4c;
+}
+
+/* Six across, always, and capped at ten rows by WORDS_SHOWN in App.tsx. Rows
+   grow downward as the list does, so a longer backlog gets taller rather than
+   narrower. The monospace face comes from .stat-word on each item, same as every
+   other word in the app. */
 .word-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(6, 1fr);
   gap: 8px;
   font-size: 1.1rem;
 }
@@ -348,6 +433,9 @@ button:hover {
   padding: 10px 14px;
   border: 1px solid #ffffff;
   border-radius: 6px;
+  /* Six fixed columns means a cell can be narrower than a long word like
+     "representation". Wrap inside the box rather than spilling out of it. */
+  overflow-wrap: anywhere;
 }
 
 .stat-columns {

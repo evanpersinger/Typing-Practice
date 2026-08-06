@@ -74,6 +74,12 @@ export interface AnalysisResponse {
   typing: TypingStats;
 }
 
+export interface AddWordResponse {
+  word: string;
+  /** False when the word was already on your list. Not a failure. */
+  added: boolean;
+}
+
 export interface SessionSummary {
   id: number;
   started_at: string;
@@ -110,6 +116,21 @@ export async function fetchSessions(): Promise<SessionSummary[]> {
 export async function fetchSessionDetail(id: number): Promise<SessionDetail> {
   const res = await fetch(`${API_BASE}/sessions/${id}`, { headers: headers() });
   if (!res.ok) throw new Error(`Failed to load that session (${res.status})`);
+  return res.json();
+}
+
+export async function addWord(word: string): Promise<AddWordResponse> {
+  const res = await fetch(`${API_BASE}/words`, {
+    method: "POST",
+    headers: headers({ "Content-Type": "application/json" }),
+    body: JSON.stringify({ word }),
+  });
+  if (!res.ok) {
+    // The backend says exactly what's wrong with the word ("One word only…").
+    // That's worth showing; a bare status code isn't.
+    const body = await res.json().catch(() => null);
+    throw new Error(body?.detail ?? `Failed to add word (${res.status})`);
+  }
   return res.json();
 }
 

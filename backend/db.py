@@ -146,16 +146,24 @@ def start_session() -> int:
         return int(cursor.lastrowid)
 
 
-def add_word(word: str, source: str = "seed") -> None:
-    """Add a word if it isn't already tracked. No-op on duplicates."""
+def add_word(word: str, source: str = "seed") -> bool:
+    """Add a word if it isn't already tracked. Returns whether it was new.
+
+    Duplicates are impossible rather than merely avoided: `words.word` is UNIQUE
+    and the insert is OR IGNORE, so a repeat is a silent no-op instead of an
+    error. Lowercasing here is what makes that hold for "Necessary" as well as
+    "necessary". The return value only exists so a caller can tell the user
+    which of the two just happened.
+    """
     word = word.strip().lower()
     if not word:
-        return
+        return False
     with _connect() as conn:
-        conn.execute(
+        cursor = conn.execute(
             "INSERT OR IGNORE INTO words (word, source) VALUES (?, ?)",
             (word, source),
         )
+        return cursor.rowcount > 0
 
 
 def seed_from_file(path: Path) -> int:

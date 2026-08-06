@@ -6,6 +6,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import {
+  addWord,
   fetchDrills,
   fetchSessionDetail,
   fetchSessions,
@@ -25,6 +26,14 @@ import {
 import { gradeDrill } from "./grade";
 
 type Tab = "practice" | "stats" | "words";
+
+// The Words grid is a fixed board: 6 across (matching index.css) by 10 down,
+// the same 60 boxes whatever the word count. Filled boxes are what you're
+// working on, empty ones are the room left, so the shape of the grid tells you
+// how big your backlog is without counting anything.
+const WORD_COLUMNS = 6;
+const WORD_ROWS = 10;
+const WORD_SLOTS = WORD_COLUMNS * WORD_ROWS;
 type Phase = "idle" | "loading" | "typing" | "submitting" | "done";
 
 // Zero rather than a dash on an empty denominator: the stats tab always renders
@@ -201,6 +210,10 @@ export default function App() {
     null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [newWord, setNewWord] = useState("");
+  // Result of the last add. Separate from `error`, because "already on your
+  // list" is an outcome, not a failure, and shouldn't render in red.
+  const [wordNote, setWordNote] = useState<string | null>(null);
 
   // Clock for the sentence on screen. Nothing displays it any more, but it's
   // still what wpm is computed from, so it has to stay honest: it counts only
@@ -347,10 +360,33 @@ export default function App() {
     stopClock(); // same as Stats — reading your list isn't typing time
     setTab("words");
     setError(null);
+    setWordNote(null); // last visit's "added receipt" isn't news any more
     try {
       setStats(await fetchStats());
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load your words.");
+    }
+  }
+
+  /** Add a word you want to practice. Refetches rather than splicing the new
+   *  word into local state: the row the server stores is the normalized one,
+   *  and inventing a second version of it here is how the two drift apart. */
+  async function submitWord() {
+    const word = newWord.trim();
+    if (!word) return;
+    setError(null);
+    setWordNote(null);
+    try {
+      const result = await addWord(word);
+      setNewWord("");
+      setWordNote(
+        result.added
+          ? `Added ${result.word}.`
+          : `${result.word} is already on your list.`,
+      );
+      setStats(await fetchStats());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not add that word.");
     }
   }
 
@@ -443,6 +479,13 @@ export default function App() {
   const weak = (stats?.words.filter((w) => w.status === "drilling") ?? []).sort(
     (a, b) => a.word.localeCompare(b.word),
   );
+
+  // Always 60 boxes: the board never grows or shrinks. Whatever's left after the
+  // words renders empty, which is what makes "47 words, 13 to spare" readable at
+  // a glance. Past 60 the extra words aren't shown — the board is the board.
+  const shownWeak = weak.slice(0, WORD_SLOTS);
+  const emptyCells = WORD_SLOTS - shownWeak.length;
+
 
   // The list screens and the start screen sit at the top. Everything else stays
   // centered, so a sentence you're typing lands under your eyes. Loading holds
@@ -653,19 +696,54 @@ export default function App() {
                   <p className="words-note">
                     these are words you need to practice
                   </p>
-                  {weak.length === 0 ? (
-                    <p className="stat-line">
-                      Nothing in rotation right now — you've mastered the lot.
-                    </p>
-                  ) : (
+
+                  <div className="words-body">
                     <ul className="word-list">
-                      {weak.map((w) => (
+                      {shownWeak.map((w) => (
                         <li key={w.word} className="stat-word">
                           {w.word}
                         </li>
                       ))}
+                      {/* Empty slots. The non-breaking space is what gives them
+                          the same height as a box with a word in it. Hidden from
+                          screen readers, since "blank, blank, blank" is noise. */}
+                      {Array.from({ length: emptyCells }, (_, i) => (
+                        <li
+                          key={`empty-${i}`}
+                          className="stat-word word-empty"
+                          aria-hidden="true"
+                        >
+                          {" "}
+                        </li>
+                      ))}
                     </ul>
-                  )}
+
+                    <div className="word-add-panel">
+                      {/* A form, so Enter submits without a key handler. */}
+                      <form
+                        className="word-add"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          submitWord();
+                        }}
+                      >
+                        <input
+                          className="word-input"
+                          value={newWord}
+                          onChange={(e) => setNewWord(e.target.value)}
+                          placeholder="add a word"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
+                        />
+                        <button type="submit" className="word-add-button">
+                          Add
+                        </button>
+                      </form>
+
+                      {wordNote && <p className="word-note-line">{wordNote}</p>}
+                    </div>
+                  </div>
                 </section>
               </div>
             )}

@@ -4,6 +4,7 @@ FastAPI app wiring the local trainer together.
 
 from __future__ import annotations
 
+import re
 from contextlib import asynccontextmanager
 from typing import Annotated
 
@@ -62,6 +63,16 @@ async def use_profile(x_profile: Annotated[str, Header()] = db.DEFAULT_PROFILE) 
 Profile = Annotated[str, Depends(use_profile)]
 
 
+# One word and nothing else: no spaces, commas, periods or digits. The
+# apostrophe and hyphen are allowed because they appear inside real words
+# ("can't", "well-known"), but not at the start, so punctuation alone can't get
+# through. Capitals aren't rejected — db.add_word lowercases, same as it does
+# for the seed files, so "Necessary" is stored as "necessary" rather than
+# bounced back at you.
+WORD_PATTERN = re.compile(r"^[a-z][a-z'-]*$")
+MAX_WORD_LENGTH = 40
+
+
 class WordResult(BaseModel):
     word: str
     typed: str
@@ -77,6 +88,10 @@ class DrillResult(BaseModel):
 
 class ResultsPayload(BaseModel):
     results: list[DrillResult]
+
+
+class WordPayload(BaseModel):
+    word: str
 
 
 @app.get("/drills")
@@ -97,6 +112,34 @@ def get_drills(profile: Profile):
         return {"words": [], "drills": []}
     generated = agent.generate_drills(words)
     return {"words": words, "drills": [d.model_dump() for d in generated.drills]}
+
+
+@app.post("/words")
+def add_practice_word(payload: WordPayload, profile: Profile):
+    """Add a word you want to practice, from the Words tab.
+
+    Validation lives here rather than in db.py because the rules are about what
+    a person is allowed to type into a box, and the answer to breaking one is an
+    HTTP 400. Storage stays unopinionated: seeded and agent-suggested words go
+    in through the same door without passing this check.
+    """
+    word = payload.word.strip().lower()
+    if not word:
+        raise HTTPException(status_code=400, detail="Type a word first.")
+    if len(word) > MAX_WORD_LENGTH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Keep it under {MAX_WORD_LENGTH} characters.",
+        )
+    if not WORD_PATTERN.match(word):
+        raise HTTPException(
+            status_code=400,
+            detail="One word only — letters, apostrophes and hyphens.",
+        )
+
+    # `added` is False when the word was already tracked. Not an error: you
+    # asked for it to be on the list and it is, so the UI says so and moves on.
+    return {"word": word, "added": db.add_word(word, source="user")}
 
 
 @app.get("/stats")
