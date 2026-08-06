@@ -6,7 +6,9 @@
     <title>Typing Practice</title>
   </head>
   <body>
-    <div id="root"></div>
+    <!-- The top padding is the only thing keeping a tall page from running
+         under the tab bar, which is absolutely positioned above it. -->
+    <div id="root" class="relative flex min-h-screen px-10 pt-22 pb-12"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

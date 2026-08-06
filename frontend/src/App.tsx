@@ -27,6 +27,29 @@ import { gradeDrill } from "./grade";
 
 type Tab = "practice" | "stats" | "words";
 
+// Text buttons, not filled boxes: the size, colour and cursor used to come from
+// a global `button {}` rule, which is gone now, so they're stated here.
+// Tailwind's reset gives buttons `cursor: default`, hence the explicit pointer.
+const TEXT_BUTTON =
+  "cursor-pointer text-[1.3rem] text-white hover:opacity-[0.55]";
+
+// Shared by the three nav buttons, which differ only in the active state.
+const TAB = `${TEXT_BUTTON} border-b-2 py-0.5 no-underline`;
+const TAB_ON = `${TAB} border-white font-semibold`;
+const TAB_OFF = `${TAB} border-transparent`;
+
+// Section headings: separated from body text by weight and size alone, never by
+// dimming. Every bit of text on these pages stays pure white.
+const HEADING = "mt-0 mb-2.5 text-[1.1rem] font-semibold";
+
+// Both stats tables. The cell rules stay on the table via [&_th]/[&_td] rather
+// than being repeated on every cell, which is how they read as one rule instead
+// of thirty copies.
+const TABLE =
+  "w-full border-collapse text-[1.1rem] " +
+  "[&_th]:border-b [&_th]:border-[#7d827e] [&_th]:py-2 [&_th]:pr-3 [&_th]:pl-0 [&_th]:text-left [&_th]:font-semibold " +
+  "[&_td]:border-b [&_td]:border-[#3f4441] [&_td]:py-2 [&_td]:pr-3 [&_td]:pl-0";
+
 // The Words grid is a fixed board: 6 across (matching index.css) by 10 down,
 // the same 60 boxes whatever the word count. Filled boxes are what you're
 // working on, empty ones are the room left, so the shape of the grid tells you
@@ -120,24 +143,24 @@ function SessionRecap({
   return (
     <>
       <section>
-        <h2 className="stat-heading">overall</h2>
-        <p className="stat-line">
+        <h2 className={HEADING}>overall</h2>
+        <p className="m-0 text-[1.4rem]">
           You spelled <b>{correctCount}</b> of {words.length} target words
           right · <b>{pct(correctCount, words.length)}</b> accuracy
         </p>
       </section>
 
       <section>
-        <h2 className="stat-heading">speed</h2>
-        <p className="stat-line">
+        <h2 className={HEADING}>speed</h2>
+        <p className="m-0 text-[1.4rem]">
           <b>{typing.avg_wpm}</b> wpm average · <b>{typing.best_wpm}</b> wpm
           best sentence
         </p>
       </section>
 
       <section>
-        <h2 className="stat-heading">words you practiced</h2>
-        <table className="stats-table">
+        <h2 className={HEADING}>words you practiced</h2>
+        <table className={TABLE}>
           <thead>
             <tr>
               <th>word</th>
@@ -148,14 +171,14 @@ function SessionRecap({
           <tbody>
             {recap.map((w) => (
               <tr key={w.word}>
-                <td className="stat-word">{w.word}</td>
+                <td className="font-mono">{w.word}</td>
                 <td>
                   {w.correct} of {w.attempts}
                 </td>
                 {/* A missed word with nothing typed is a sentence you
                     cut short, which is worth seeing as its own thing
                     rather than as a blank cell. */}
-                <td className="stat-word">
+                <td className="font-mono">
                   {w.correct === w.attempts
                     ? "✓"
                     : w.typos.length > 0
@@ -170,17 +193,17 @@ function SessionRecap({
 
       {patternSummary && (
         <section>
-          <h2 className="stat-heading">pattern</h2>
-          <p className="stat-line">{patternSummary}</p>
+          <h2 className={HEADING}>pattern</h2>
+          <p className="m-0 text-[1.4rem]">{patternSummary}</p>
         </section>
       )}
 
       {newWords.length > 0 && (
         <section>
-          <h2 className="stat-heading">added to your list</h2>
+          <h2 className={HEADING}>added to your list</h2>
           {newWords.map((w) => (
-            <p key={w.word} className="new-word">
-              <b>{w.word}</b> {w.reason}
+            <p key={w.word} className="my-1.5">
+              <b className="font-mono">{w.word}</b> {w.reason}
             </p>
           ))}
         </section>
@@ -492,19 +515,42 @@ export default function App() {
   // the start screen's position, since it's still the start screen on display.
   const cardClass =
     tab === "words"
-      ? "card card-words"
+      ? // Pulled hard into the top-left corner, out of #root's padding (which is
+        // only there to clear the floating tab bar), and wider than the 880px
+        // reading column since this is a six-across grid, not prose.
+        "w-full max-w-[1280px] self-start -mt-10 -ml-4"
       : tab === "stats"
-        ? "card card-stats"
+        ? // Stats reads like a page, not a prompt, so it starts top-left.
+          "m-0 w-full max-w-[880px] self-start"
         : phase === "idle" || phase === "loading"
-          ? "card card-top"
-          : "card";
+          ? // The start screen is two short lines; centering them leaves the
+            // button floating in an empty page, so it pins to the top.
+            "mx-auto my-0 w-full max-w-[880px] self-start"
+          : // Centered, so the sentence you're typing lands under your eyes.
+            // Auto margins rather than align-items, which clips the top of
+            // anything taller than the viewport.
+            "m-auto w-full max-w-[880px]";
 
   if (profile === null) {
     return (
-      <div className="card">
-        <div className="profile-picker">
-          <button onClick={() => chooseProfile("testing")}>Testing</button>
-          <button onClick={() => chooseProfile("personal")}>Personal</button>
+      <div className="m-auto w-full max-w-[880px]">
+        {/* The one screen where the buttons are the whole page, so they get to
+            be real boxes rather than the text links used everywhere else. A
+            faint fill on hover rather than the usual fade, since fading a box
+            this size takes the label with it. */}
+        <div className="flex gap-6">
+          <button
+            onClick={() => chooseProfile("testing")}
+            className="flex-1 cursor-pointer rounded-xl border border-white px-6 py-[90px] text-[3.6rem] text-white no-underline hover:bg-white/8"
+          >
+            Testing
+          </button>
+          <button
+            onClick={() => chooseProfile("personal")}
+            className="flex-1 cursor-pointer rounded-xl border border-white px-6 py-[90px] text-[3.6rem] text-white no-underline hover:bg-white/8"
+          >
+            Personal
+          </button>
         </div>
       </div>
     );
@@ -512,21 +558,23 @@ export default function App() {
 
   return (
     <>
-      <nav className="tabs">
+      {/* Absolute, not fixed, so it scrolls away over a long stats table
+          instead of floating on top of it. */}
+      <nav className="absolute top-7 left-1/2 flex -translate-x-1/2 gap-6">
         <button
-          className={tab === "practice" ? "tab tab-active" : "tab"}
+          className={tab === "practice" ? TAB_ON : TAB_OFF}
           onClick={() => setTab("practice")}
         >
           Practice
         </button>
         <button
-          className={tab === "stats" ? "tab tab-active" : "tab"}
+          className={tab === "stats" ? TAB_ON : TAB_OFF}
           onClick={openStats}
         >
           Stats
         </button>
         <button
-          className={tab === "words" ? "tab tab-active" : "tab"}
+          className={tab === "words" ? TAB_ON : TAB_OFF}
           onClick={openWords}
         >
           Words
@@ -535,7 +583,13 @@ export default function App() {
 
       {/* Always on screen, because a profile you can't see is a profile you can
           forget you're in. Click it to go back to the picker. */}
-      <button className="profile-chip" onClick={switchProfile}>
+      {/* The profile name is a wire value ("testing"), capitalized for display
+          only — changing the value would mean changing the header the backend
+          keys off, for the sake of a capital letter. */}
+      <button
+        className="absolute top-7 right-10 cursor-pointer rounded-full border border-white px-5.5 py-2 text-[1.6rem] text-white no-underline capitalize hover:opacity-[0.55]"
+        onClick={switchProfile}
+      >
         {profile}
       </button>
 
@@ -544,10 +598,13 @@ export default function App() {
           <>
             {phase === "idle" && (
               <>
-                <button className="start-session" onClick={startSession}>
+                <button
+                  className="cursor-pointer rounded-[10px] border border-white px-13 py-6 text-[2.4rem] text-white no-underline hover:bg-white/8"
+                  onClick={startSession}
+                >
                   Start session
                 </button>
-                {error && <p className="error">{error}</p>}
+                {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}
               </>
             )}
 
@@ -555,18 +612,26 @@ export default function App() {
                 spinner is the only thing on screen that says so. */}
             {phase === "loading" && (
               <>
-                <p className="instruction">Starting session…</p>
-                <div className="spinner" />
+                <p className="mt-0 mb-7 text-[2.4rem]">Starting session…</p>
+                {/* One white arc on an invisible ring, rather than a white
+                    circle over a gray one. Same reason everything else here is
+                    pure white: no gray anywhere. */}
+                <div className="size-11 animate-[spin_0.8s_linear_infinite] rounded-full border-[3px] border-transparent border-t-white" />
               </>
             )}
 
             {phase === "typing" && drills[index] && (
               <>
-                <p className="prompt">{drills[index].sentence}</p>
+                {/* Prompt and input are deliberately the same size and face.
+                    You read one while typing the other, so any mismatch makes
+                    them harder to compare. */}
+                <p className="mb-4 font-mono text-[1.9rem] leading-[1.6]">
+                  {drills[index].sentence}
+                </p>
                 <input
                   key={index}
                   ref={inputRef}
-                  className="typing-input"
+                  className="w-full rounded-lg border border-[#4a4f4c] bg-[#1e2220] px-4.5 py-4 font-mono text-[1.9rem] text-white outline-none placeholder:text-[#7d827e] focus:border-white"
                   value={current}
                   onChange={handleChange}
                   onKeyDown={handleKeyDown}
@@ -574,25 +639,37 @@ export default function App() {
                   autoCorrect="off"
                   spellCheck={false}
                 />
-                <button className="end-session" onClick={endSession}>
+                {/* A way out, not an invitation. Small, so it never competes
+                    with the sentence you're supposed to be reading. */}
+                <button
+                  className="mt-5 cursor-pointer rounded-lg border border-white px-8 py-3.5 text-[1.4rem] text-white no-underline hover:bg-white/8"
+                  onClick={endSession}
+                >
                   End session
                 </button>
-                {error && <p className="error">{error}</p>}
+                {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}
               </>
             )}
 
             {phase === "submitting" && <p>Checking your typing…</p>}
 
             {phase === "done" && analysis && (
-              <div className="summary">
-                <h1 className="results-title">Session results</h1>
+              <div className="flex flex-col gap-7 leading-[1.6]">
+                <h1 className="m-0 text-[2.4rem]">Session results</h1>
                 <SessionRecap
                   words={results}
                   typing={analysis.typing}
                   patternSummary={analysis.pattern_summary}
                   newWords={analysis.new_words}
                 />
-                <button onClick={backToPractice}>Back to practice</button>
+                {/* self-start, or the flex column stretches it and a text
+                    button renders as a full-width bar. */}
+                <button
+                  className={`${TEXT_BUTTON} self-start underline underline-offset-4`}
+                  onClick={backToPractice}
+                >
+                  Back to practice
+                </button>
               </div>
             )}
           </>
@@ -603,27 +680,31 @@ export default function App() {
             {stats === null && !error && <p>Loading your stats…</p>}
 
             {stats && (
-              <div className="stats">
-                <section className="stat-columns">
-                  <div className="stat-column">
-                    <span className="stat-value">
+              <div className="flex flex-col gap-8">
+                <section className="flex gap-12">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[2rem] font-semibold">
                       {pct(totalAttempts - totalMisses, totalAttempts)}
                     </span>
-                    <span className="stat-label">accuracy</span>
+                    <span className="text-[1.1rem]">accuracy</span>
                   </div>
-                  <div className="stat-column">
-                    <span className="stat-value">{stats.typing.avg_wpm}</span>
-                    <span className="stat-label">avg wpm</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[2rem] font-semibold">
+                      {stats.typing.avg_wpm}
+                    </span>
+                    <span className="text-[1.1rem]">avg wpm</span>
                   </div>
-                  <div className="stat-column">
-                    <span className="stat-value">{stats.typing.best_wpm}</span>
-                    <span className="stat-label">best wpm</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[2rem] font-semibold">
+                      {stats.typing.best_wpm}
+                    </span>
+                    <span className="text-[1.1rem]">best wpm</span>
                   </div>
                 </section>
 
                 <section>
-                  <h2 className="stat-heading">words you struggle with</h2>
-                  <table className="stats-table">
+                  <h2 className={HEADING}>words you struggle with</h2>
+                  <table className={TABLE}>
                     <thead>
                       <tr>
                         <th>word</th>
@@ -635,7 +716,7 @@ export default function App() {
                     <tbody>
                       {missed.map((w) => (
                         <tr key={w.word}>
-                          <td className="stat-word">{w.word}</td>
+                          <td className="font-mono">{w.word}</td>
                           <td>{w.misses}</td>
                           <td>{w.attempts}</td>
                           <td>{pct(w.misses, w.attempts)}</td>
@@ -646,9 +727,13 @@ export default function App() {
                 </section>
 
                 <section>
-                  <h2 className="stat-heading">sessions</h2>
+                  <h2 className={HEADING}>sessions</h2>
+                  {/* Matches the typing input's look, so the dropdown reads as
+                      part of the same UI instead of an unstyled browser
+                      control. font-family: inherit, not Tailwind's sans stack,
+                      to keep the app's face. */}
                   <select
-                    className="session-select"
+                    className="rounded-lg border border-[#4a4f4c] bg-[#1e2220] px-3.5 py-2.5 text-[1.3rem] text-white [font-family:inherit] focus:border-white focus:outline-none"
                     value={selectedSessionId}
                     onChange={(e) =>
                       selectSession(
@@ -666,7 +751,7 @@ export default function App() {
 
                   {selectedSessionId !== "" &&
                     (sessionDetail && sessionDetail.id === selectedSessionId ? (
-                      <div className="summary session-gap">
+                      <div className="mt-7 flex flex-col gap-7 leading-[1.6]">
                         <SessionRecap
                           words={sessionDetail.words}
                           typing={sessionDetail.typing}
@@ -675,13 +760,13 @@ export default function App() {
                         />
                       </div>
                     ) : (
-                      <p className="session-gap">Loading session…</p>
+                      <p className="mt-7">Loading session…</p>
                     ))}
                 </section>
               </div>
             )}
 
-            {error && <p className="error">{error}</p>}
+            {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}
           </>
         )}
 
@@ -690,17 +775,24 @@ export default function App() {
             {stats === null && !error && <p>Loading your words…</p>}
 
             {stats && (
-              <div className="stats">
+              <div>
                 <section>
-                  <h2 className="words-heading">Weak Words</h2>
-                  <p className="words-note">
+                  <h2 className="mt-0 mb-2 text-[1.8rem] font-semibold">
+                    Weak Words
+                  </h2>
+                  <p className="mt-0 mb-6 text-[1.3rem]">
                     these are words you need to practice
                   </p>
 
-                  <div className="words-body">
-                    <ul className="word-list">
+                  {/* Grid left, add-a-word right. items-start keeps the panel
+                      at the top rather than stretching down ten rows. */}
+                  <div className="flex items-start gap-8">
+                    <ul className="grid min-w-0 flex-1 list-none grid-cols-6 gap-2 p-0 text-[1.1rem]">
                       {shownWeak.map((w) => (
-                        <li key={w.word} className="stat-word">
+                        <li
+                          key={w.word}
+                          className="rounded-md border border-white px-3.5 py-2.5 font-mono [overflow-wrap:anywhere]"
+                        >
                           {w.word}
                         </li>
                       ))}
@@ -710,7 +802,7 @@ export default function App() {
                       {Array.from({ length: emptyCells }, (_, i) => (
                         <li
                           key={`empty-${i}`}
-                          className="stat-word word-empty"
+                          className="rounded-md border border-[#4a4f4c] px-3.5 py-2.5 font-mono"
                           aria-hidden="true"
                         >
                           {" "}
@@ -718,17 +810,17 @@ export default function App() {
                       ))}
                     </ul>
 
-                    <div className="word-add-panel">
+                    <div className="shrink-0 grow-0 basis-[220px]">
                       {/* A form, so Enter submits without a key handler. */}
                       <form
-                        className="word-add"
+                        className="flex flex-col gap-2.5"
                         onSubmit={(e) => {
                           e.preventDefault();
                           submitWord();
                         }}
                       >
                         <input
-                          className="word-input"
+                          className="w-full rounded-md border border-[#4a4f4c] bg-[#1e2220] px-3.5 py-2.5 font-mono text-[1.1rem] text-white outline-none placeholder:text-[#7d827e] focus:border-white"
                           value={newWord}
                           onChange={(e) => setNewWord(e.target.value)}
                           placeholder="add a word"
@@ -736,19 +828,24 @@ export default function App() {
                           autoCorrect="off"
                           spellCheck={false}
                         />
-                        <button type="submit" className="word-add-button">
+                        <button
+                          type="submit"
+                          className="cursor-pointer rounded-md border border-white px-6 py-2.5 text-[1.1rem] text-white no-underline hover:bg-white/8"
+                        >
                           Add
                         </button>
                       </form>
 
-                      {wordNote && <p className="word-note-line">{wordNote}</p>}
+                      {wordNote && (
+                        <p className="mt-0 mb-4 text-[1.1rem]">{wordNote}</p>
+                      )}
                     </div>
                   </div>
                 </section>
               </div>
             )}
 
-            {error && <p className="error">{error}</p>}
+            {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}
           </>
         )}
       </div>

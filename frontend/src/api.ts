@@ -1,4 +1,6 @@
-export const API_BASE = "http://localhost:8016";
+// Same-origin. The dev server proxies /api to the backend (vite.config.ts), so
+// the port lives in one place instead of being baked into the app code.
+export const API_BASE = "/api";
 
 /** Which world you're in. `personal` is your real data; `testing` is a separate
  *  database you can throw junk at. The backend keys off the header below. */

@@ -9,7 +9,6 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from backend import agent, db, test_agent
@@ -33,16 +32,10 @@ async def lifespan(app: FastAPI):
     yield
 
 
+# No CORS middleware: the Vite dev server proxies /api through to here, so every
+# request arrives same-origin as far as the browser is concerned. The frontend's
+# port is no longer this module's business.
 app = FastAPI(title="Typing Practice", lifespan=lifespan)
-
-# The Vite dev server runs on 5183 and calls this backend on 8016.
-# allows frontend to talk to the backend.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5183"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 async def use_profile(x_profile: Annotated[str, Header()] = db.DEFAULT_PROFILE) -> str:
