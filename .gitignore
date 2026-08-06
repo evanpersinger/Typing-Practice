@@ -10,8 +10,6 @@ __pycache__/
 seed_words_personal.txt
 typing.db
 typing_test.db
-weak_words.md
-weak_words_test.md
 sessions/
 sessions_test/
 

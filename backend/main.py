@@ -29,7 +29,6 @@ async def lifespan(app: FastAPI):
         db.init_db()
         for path in db.active_profile().seeds:
             db.seed_from_file(path)
-        db.render_markdown()
     yield
 
 
@@ -126,7 +125,6 @@ def submit_results(payload: ResultsPayload, profile: Profile):
     for suggestion in analysis.new_words:
         db.add_word(suggestion.word, source="agent")
 
-    db.render_markdown()
     db.finish_session(
         session_id,
         analysis.pattern_summary,

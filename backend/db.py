@@ -1,8 +1,8 @@
 """SQLite storage for the typing trainer.
 
-This is the source of truth for word stats. `weak_words.md` is a human-readable
-view rendered from here, and the agent never does the arithmetic — the plain
-functions below own attempts / misses / streak / graduation.
+This is the source of truth for word stats, and the agent never does the
+arithmetic — the plain functions below own attempts / misses / streak /
+graduation.
 
 Everything here reads and writes whichever profile is active for the current
 request, so the practice loop never has to know there's more than one.
@@ -24,7 +24,7 @@ MASTERY_STREAK = 10
 
 @dataclass(frozen=True)
 class Profile:
-    """One self-contained world: its own database, word list, and transcripts.
+    """One self-contained world: its own database, seed list, and transcripts.
 
     Separate *files* rather than a flag column on every row. A flag is only as
     good as the WHERE clause you remember to write, and the one thing this
@@ -33,7 +33,6 @@ class Profile:
     """
 
     db: Path
-    markdown: Path
     sessions: Path
     seeds: tuple[Path, ...]
 
@@ -41,7 +40,6 @@ class Profile:
 PROFILES: dict[str, Profile] = {
     "personal": Profile(
         db=BASE_DIR / "typing.db",
-        markdown=BASE_DIR / "weak_words.md",
         sessions=BASE_DIR / "sessions",
         # The committed example list first, so a fresh clone isn't empty, then
         # your real list on top (not committed) if it exists. Dedup on insert
@@ -50,7 +48,6 @@ PROFILES: dict[str, Profile] = {
     ),
     "testing": Profile(
         db=BASE_DIR / "typing_test.db",
-        markdown=BASE_DIR / "weak_words_test.md",
         sessions=BASE_DIR / "sessions_test",
         seeds=(BASE_DIR / "seed_words.txt",),
     ),
@@ -199,8 +196,8 @@ def get_mastered_sample(n: int = 2) -> list[str]:
 
 
 def get_all_words() -> list[dict]:
-    """Every tracked word with its counters, worst first. Backs both the stats
-    endpoint and the markdown view, so the ordering only lives here."""
+    """Every tracked word with its counters, worst first. Backs the stats
+    endpoint, so the ordering only lives here."""
     with _connect() as conn:
         rows = conn.execute(
             """
@@ -310,25 +307,6 @@ def record_result(
             """,
             (attempts, misses, streak, status, today, word),
         )
-
-
-def render_markdown() -> None:
-    """Rewrite the active profile's word list from the DB — the human-readable view."""
-    rows = get_all_words()
-
-    lines = [
-        "# Weak words",
-        "",
-        "| word | attempts | misses | streak | status | source | last seen |",
-        "|---|---|---|---|---|---|---|",
-    ]
-    for row in rows:
-        lines.append(
-            f"| {row['word']} | {row['attempts']} | {row['misses']} | "
-            f"{row['streak']} | {row['status']} | {row['source']} | "
-            f"{row['last_seen'] or '-'} |"
-        )
-    active_profile().markdown.write_text("\n".join(lines) + "\n")
 
 
 def write_session_transcript(

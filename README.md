@@ -35,7 +35,6 @@ time you load the page. Nothing is remembered, on purpose.
 | | Personal | Testing |
 |---|---|---|
 | database | `typing.db` | `typing_test.db` |
-| word list | `weak_words.md` | `weak_words_test.md` |
 | transcripts | `sessions/` | `sessions_test/` |
 | sentences | written by Claude, from your weak words | canned, fixed (`backend/test_agent.py`) |
 | analysis | Claude | canned |
@@ -82,9 +81,6 @@ SQLite, four tables, all in `backend/db.py`:
 
 Ten clean hits in a row graduates a word to `mastered`. One miss puts it
 straight back into `drilling`.
-
-`weak_words.md` is rendered from the database after every session. It's a view,
-not a source: edit it and you'll just lose your changes.
 
 **wpm** is total characters over total time, five characters to a "word", the
 usual typing-test convention. Not the average of per-sentence rates, which would
