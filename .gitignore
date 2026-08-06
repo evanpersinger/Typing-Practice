@@ -6,7 +6,7 @@ __pycache__/
 # Secrets
 .env
 
-# App data — personal profile, generated or local-only
+# App data
 seed_words_personal.txt
 typing.db
 typing_test.db
@@ -20,3 +20,6 @@ dist/
 # Editor / tooling
 .claude/settings.local.json
 .vscode/
+
+# AI 
+.playwright-mcp/

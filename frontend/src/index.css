@@ -300,6 +300,56 @@ button:hover {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* The Words tab is one list and nothing else, so its heading is the page title
+   rather than one section label among several. Bigger than .stat-heading for
+   that reason, and not shared with it. */
+/* Tucked further into the corner than the stats page. This tab is one list under
+   one title, so the title acts as the page header and belongs hard top-left. The
+   negative margins pull it back out of #root's padding, which is only there to
+   keep the centered layouts clear of the floating tab bar. Safe horizontally:
+   the tabs are centered, this sits at the far left. */
+.card-words {
+  margin: -40px 0 0 -16px;
+  align-self: flex-start;
+}
+
+.words-heading {
+  margin: 0 0 8px;
+  font-size: 1.8rem;
+  font-weight: 600;
+}
+
+/* Bigger than the words in the grid below, so it reads as a line about the list
+   rather than an entry in it. Set apart by size alone — no gray, no dimming, it
+   stays pure white like everything else. */
+.words-note {
+  margin: 0 0 24px;
+  font-size: 1.3rem;
+}
+
+/* Columns rather than one tall list: a rotation runs to forty-odd words, and a
+   single column makes you scroll for a list you're meant to take in at a glance.
+   The monospace face comes from .stat-word on each item, same as every other
+   word in the app. */
+.word-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  font-size: 1.1rem;
+}
+
+/* One cell per word, outlined in the same pure white as every other box in the
+   app (the picker buttons, End session, the profile chip) rather than the dim
+   input border, so the grid doesn't read as disabled. */
+.word-list li {
+  padding: 10px 14px;
+  border: 1px solid #ffffff;
+  border-radius: 6px;
+}
+
 .stat-columns {
   display: flex;
   gap: 48px;

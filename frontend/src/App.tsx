@@ -24,7 +24,7 @@ import {
 } from "./api";
 import { gradeDrill } from "./grade";
 
-type Tab = "practice" | "stats";
+type Tab = "practice" | "stats" | "words";
 type Phase = "idle" | "loading" | "typing" | "submitting" | "done";
 
 // Zero rather than a dash on an empty denominator: the stats tab always renders
@@ -340,6 +340,20 @@ export default function App() {
     }
   }
 
+  /** The plain list of what you're working on. Shares the stats endpoint rather
+   *  than adding one of its own, and skips the sessions fetch that Stats needs:
+   *  there's no session dropdown on this tab. */
+  async function openWords() {
+    stopClock(); // same as Stats — reading your list isn't typing time
+    setTab("words");
+    setError(null);
+    try {
+      setStats(await fetchStats());
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load your words.");
+    }
+  }
+
   /** Pull up one past session's recap. Clears the old one first so switching
    *  sessions never shows stale data under the newly picked date while the
    *  fetch is still in flight. */
@@ -421,15 +435,26 @@ export default function App() {
     .filter((w) => w.misses > 0)
     .sort((a, b) => b.misses - a.misses || b.attempts - a.attempts);
 
-  // Stats and the start screen both sit at the top. Everything else stays
+  // Everything still in rotation. Unlike the table above this is the whole list,
+  // not just the words you've missed: a word you haven't reached yet is still one
+  // you need to practice. Alphabetical rather than the backend's worst-first,
+  // because this is a list you scan for a word, not a ranking. Sorting the
+  // filtered copy, so the order the stats tab relies on is left alone.
+  const weak = (stats?.words.filter((w) => w.status === "drilling") ?? []).sort(
+    (a, b) => a.word.localeCompare(b.word),
+  );
+
+  // The list screens and the start screen sit at the top. Everything else stays
   // centered, so a sentence you're typing lands under your eyes. Loading holds
   // the start screen's position, since it's still the start screen on display.
   const cardClass =
-    tab === "stats"
-      ? "card card-stats"
-      : phase === "idle" || phase === "loading"
-        ? "card card-top"
-        : "card";
+    tab === "words"
+      ? "card card-words"
+      : tab === "stats"
+        ? "card card-stats"
+        : phase === "idle" || phase === "loading"
+          ? "card card-top"
+          : "card";
 
   if (profile === null) {
     return (
@@ -456,6 +481,12 @@ export default function App() {
           onClick={openStats}
         >
           Stats
+        </button>
+        <button
+          className={tab === "words" ? "tab tab-active" : "tab"}
+          onClick={openWords}
+        >
+          Words
         </button>
       </nav>
 
@@ -603,6 +634,38 @@ export default function App() {
                     ) : (
                       <p className="session-gap">Loading session…</p>
                     ))}
+                </section>
+              </div>
+            )}
+
+            {error && <p className="error">{error}</p>}
+          </>
+        )}
+
+        {tab === "words" && (
+          <>
+            {stats === null && !error && <p>Loading your words…</p>}
+
+            {stats && (
+              <div className="stats">
+                <section>
+                  <h2 className="words-heading">Weak Words</h2>
+                  <p className="words-note">
+                    these are words you need to practice
+                  </p>
+                  {weak.length === 0 ? (
+                    <p className="stat-line">
+                      Nothing in rotation right now — you've mastered the lot.
+                    </p>
+                  ) : (
+                    <ul className="word-list">
+                      {weak.map((w) => (
+                        <li key={w.word} className="stat-word">
+                          {w.word}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </section>
               </div>
             )}
