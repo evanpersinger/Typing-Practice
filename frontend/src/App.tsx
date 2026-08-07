@@ -785,82 +785,80 @@ export default function App() {
             {stats === null && !error && <p>Loading your words…</p>}
 
             {stats && (
-              <div>
-                <section>
-                  <h2 className="mt-0 mb-2 text-[1.8rem] font-semibold">
-                    Weak Words{" "}
-                    <span className="font-mono">
-                      ({weak.length}/{WORD_SLOTS})
-                    </span>
-                  </h2>
-                  <p className="mt-0 mb-6 text-[1.3rem]">
-                    these are words you need to practice
-                  </p>
+              <section>
+                <h2 className="mt-0 mb-2 text-[1.8rem] font-semibold">
+                  Weak Words{" "}
+                  <span className="font-mono">
+                    ({weak.length}/{WORD_SLOTS})
+                  </span>
+                </h2>
+                <p className="mt-0 mb-6 text-[1.3rem]">
+                  these are words you need to practice
+                </p>
 
-                  {/* ml-auto on the panel pins it to this row's right edge, so
-                      mr here is what walks it back toward the middle. */}
-                  <div className="mr-24 flex items-start gap-12">
-                    {/* border-separate keeps each cell its own rounded box
-                        instead of collapsing into shared grid lines. */}
-                    <table
-                      className={`${WORD_TABLE_WIDTH} table-fixed border-separate border-spacing-2 font-mono text-[1.15rem]`}
+                {/* ml-auto on the panel pins it to this row's right edge, so
+                    mr here is what walks it back toward the middle. */}
+                <div className="mr-24 flex items-start gap-12">
+                  {/* border-separate keeps each cell its own rounded box
+                      instead of collapsing into shared grid lines. */}
+                  <table
+                    className={`${WORD_TABLE_WIDTH} table-fixed border-separate border-spacing-2 font-mono text-[1.15rem]`}
+                  >
+                    <tbody>
+                      {wordRows.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {row.map((entry, colIndex) => (
+                            <td
+                              key={colIndex}
+                              className="rounded-md border border-white px-2 py-3 text-center whitespace-nowrap"
+                              aria-hidden={entry ? undefined : "true"}
+                            >
+                              {entry ? entry.word : " "}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* w-max: the heading is nowrap, so it sets the panel's
+                      width and the panel follows when you resize it. */}
+                  <div className="ml-auto w-max shrink-0 grow-0">
+                    <p className="mt-0 mb-2.5 text-[1.9rem] whitespace-nowrap">
+                      Add words you want to practice
+                    </p>
+
+                    {/* A form, so Enter submits without a key handler. */}
+                    <form
+                      className="flex flex-col gap-2.5"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        submitWord();
+                      }}
                     >
-                      <tbody>
-                        {wordRows.map((row, rowIndex) => (
-                          <tr key={rowIndex}>
-                            {row.map((entry, colIndex) => (
-                              <td
-                                key={colIndex}
-                                className="rounded-md border border-white px-2 py-3 text-center whitespace-nowrap"
-                                aria-hidden={entry ? undefined : "true"}
-                              >
-                                {entry ? entry.word : " "}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {/* w-max: the heading is nowrap, so it sets the panel's
-                        width and the panel follows when you resize it. */}
-                    <div className="ml-auto w-max shrink-0 grow-0">
-                      <p className="mt-0 mb-2.5 text-[1.9rem] whitespace-nowrap">
-                        Add words you want to practice
-                      </p>
-
-                      {/* A form, so Enter submits without a key handler. */}
-                      <form
-                        className="flex flex-col gap-2.5"
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          submitWord();
-                        }}
+                      <input
+                        className="w-full rounded-md border border-[#4a4f4c] bg-[#1e2220] px-5 py-3 font-mono text-[1.4rem] text-white outline-none placeholder:text-[#7d827e] focus:border-white"
+                        value={newWord}
+                        onChange={(e) => setNewWord(e.target.value)}
+                        placeholder="add a word"
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                      />
+                      <button
+                        type="submit"
+                        className="cursor-pointer rounded-md border border-white px-6 py-3 text-[1.9rem] text-white no-underline hover:bg-white/8"
                       >
-                        <input
-                          className="w-full rounded-md border border-[#4a4f4c] bg-[#1e2220] px-5 py-3 font-mono text-[1.4rem] text-white outline-none placeholder:text-[#7d827e] focus:border-white"
-                          value={newWord}
-                          onChange={(e) => setNewWord(e.target.value)}
-                          placeholder="add a word"
-                          autoComplete="off"
-                          autoCorrect="off"
-                          spellCheck={false}
-                        />
-                        <button
-                          type="submit"
-                          className="cursor-pointer rounded-md border border-white px-6 py-3 text-[1.9rem] text-white no-underline hover:bg-white/8"
-                        >
-                          Add
-                        </button>
-                      </form>
+                        Add
+                      </button>
+                    </form>
 
-                      {wordNote && (
-                        <p className="mt-0 mb-4 text-[1.3rem]">{wordNote}</p>
-                      )}
-                    </div>
+                    {wordNote && (
+                      <p className="mt-0 mb-4 text-[1.3rem]">{wordNote}</p>
+                    )}
                   </div>
-                </section>
-              </div>
+                </div>
+              </section>
             )}
 
             {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}

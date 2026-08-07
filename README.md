@@ -9,23 +9,23 @@ times in a row graduate out. New words get added when Claude spots a weakness.
 
 ## Running it
 
-Backend (port 8016):
-
 ```
-uv sync
-uv run uvicorn backend.main:app --reload --port 8016
+make install
 ```
 
-Frontend (port 5183):
+Then, in two terminals:
 
 ```
-cd frontend
-pnpm install
-pnpm run dev
+make backend     # port 8016
+make frontend    # port 5183
 ```
 
-Then open http://localhost:5183/. Needs `ANTHROPIC_API_KEY` in `.env` at the
-repo root.
+Open http://localhost:5183/, the frontend one. Needs `ANTHROPIC_API_KEY` in
+`.env` at the repo root.
+
+The frontend proxies `/api` to the backend (set in `frontend/vite.config.ts`),
+so the browser only ever talks to one port and there's no CORS to configure.
+That proxy is dev-only: a real deployment would need a reverse proxy in front.
 
 ## Profiles
 
@@ -67,6 +67,23 @@ it to the request and every read and write follows it from there.
 The half-typed one on screen is dropped: that's an interruption, not a
 misspelling, and grading it would put a word back in rotation for no reason.
 
+## Weak words
+
+The **Words** tab is a fixed board of 60 cells, six across by ten down, holding
+the words still in rotation in alphabetical order. The empty cells are the point
+as much as the full ones: the shape of the board is how much backlog you have,
+readable without counting. The heading gives the same thing as a number.
+
+You can also add a word yourself. `POST /words` lowercases it and takes letters,
+apostrophes and hyphens only, up to 40 characters, so a phrase or a sentence gets
+rejected rather than stored as one unpronounceable "word". Duplicates aren't
+merely avoided, they're impossible: `words.word` is `UNIQUE` and the insert is
+`OR IGNORE`, so adding a word twice is a silent no-op. The response says whether
+the word was new, which is the only reason that route returns anything.
+
+Words added this way start with no attempts, so they sort straight to the top of
+the weakest list and show up in your next session.
+
 ## Data
 
 SQLite, four tables, all in `backend/db.py`:
@@ -91,8 +108,10 @@ let a four-word sentence count as much as a long one.
 - `backend/` — FastAPI server (port 8016). `main.py` wires up the routes, `db.py`
   owns all storage and arithmetic, `agent.py`/`test_agent.py` own the Claude calls.
   Nothing else in the app touches SQLite or Claude directly.
-- `frontend/` — React + Vite single-page app (port 5183). Fetches from the
-  backend over plain HTTP; no server-side rendering, no router, one page.
+- `frontend/` — React + Vite single-page app (port 5183). Talks to the backend
+  through the `/api` proxy; no server-side rendering, no router, one page.
+  Styled with Tailwind, so there's no stylesheet to speak of: `index.css` is
+  the Tailwind import, the page background, and one keyframe.
 - `sessions/` / `sessions_test/` — one markdown transcript per sitting, written
   after every drill: prompt, what you typed, and the pattern Claude found.
   A readable history, not just database rows. Gitignored, personal and testing
@@ -100,14 +119,15 @@ let a four-word sentence count as much as a long one.
 
 ```
 backend/
-  main.py        FastAPI: /drills, /stats, /results. Picks the profile per request.
+  main.py        FastAPI: /drills, /stats, /results, /words. Picks the profile per request.
   db.py          All storage and all arithmetic. The agent never does math.
   agent.py       The two Claude calls: write sentences, find the pattern.
   test_agent.py  Same two functions, canned. Used by the testing profile.
 frontend/src/
-  App.tsx        The whole UI: profile picker, practice, results, stats.
-  api.ts         The three fetch calls, and the profile header.
+  App.tsx        The whole UI: profile picker, practice, results, stats, words.
+  api.ts         The fetch calls, and the profile header.
   grade.ts       Aligns typed words to expected words and marks the targets.
+  index.css      Tailwind import, page background, one keyframe. That's all.
 seed_words.txt          Example word list, committed. Baseline for both profiles.
 seed_words_personal.txt Your real word list, gitignored. Layers on top, personal only.
 ```

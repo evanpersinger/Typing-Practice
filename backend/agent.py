@@ -85,7 +85,6 @@ def generate_drills(words: list[str], count: int = 10) -> GeneratedDrills:
 
 
 # session end: find the pattern behind the misses
-
 def analyze_session(misses: list[dict]) -> Analysis:
     """`misses` is a list of {"word": target, "typed": what_the_user_typed}."""
     if not misses:
