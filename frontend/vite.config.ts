@@ -5,7 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
-    port: 5183,
+    port: 3005,
     strictPort: true,
     // The frontend calls /api/… on its own origin and this forwards it to the
     // backend, so the browser never makes a cross-origin request and the

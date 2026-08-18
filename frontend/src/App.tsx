@@ -229,6 +229,9 @@ export default function App() {
   const [current, setCurrent] = useState("");
   const [results, setResults] = useState<WordResult[]>([]);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
+  // The end-of-session recap is fetched either way, it just stays folded away
+  // until you ask for it. Finishing a session shouldn't shove numbers at you.
+  const [showRecap, setShowRecap] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<number | "">("");
@@ -280,6 +283,7 @@ export default function App() {
     setCurrent("");
     setResults([]);
     setAnalysis(null);
+    setShowRecap(false);
     resetClock();
   }
 
@@ -431,9 +435,8 @@ export default function App() {
     }
   }
 
-  // Back to the start screen without spending a Claude call. "Practice again"
-  // used to be the only way off this screen, and it committed you to a whole
-  // new session just to leave.
+  // Back to the start screen without spending a Claude call. Only reachable by
+  // quitting on the first sentence now, where there's nothing worth submitting.
   function backToPractice() {
     resetSession();
     setPhase("idle");
@@ -665,21 +668,31 @@ export default function App() {
 
             {phase === "done" && analysis && (
               <div className="flex flex-col gap-7 leading-[1.6]">
-                <h1 className="m-0 text-[2.4rem]">Session results</h1>
-                <SessionRecap
-                  words={results}
-                  typing={analysis.typing}
-                  patternSummary={analysis.pattern_summary}
-                  newWords={analysis.new_words}
-                />
-                {/* self-start, or the flex column stretches it and a text
-                    button renders as a full-width bar. */}
-                <button
-                  className={`${TEXT_BUTTON} self-start underline underline-offset-4`}
-                  onClick={backToPractice}
-                >
-                  Back to practice
-                </button>
+                <h1 className="m-0 text-[2.4rem]">Session complete</h1>
+                {/* self-start, or the flex row stretches and text buttons
+                    render as full-width bars. */}
+                <div className="flex gap-8 self-start">
+                  <button
+                    className={`${TEXT_BUTTON} underline underline-offset-4`}
+                    onClick={startSession}
+                  >
+                    New session
+                  </button>
+                  <button
+                    className={`${TEXT_BUTTON} underline underline-offset-4`}
+                    onClick={() => setShowRecap(!showRecap)}
+                  >
+                    {showRecap ? "Hide stats" : "Show stats"}
+                  </button>
+                </div>
+                {showRecap && (
+                  <SessionRecap
+                    words={results}
+                    typing={analysis.typing}
+                    patternSummary={analysis.pattern_summary}
+                    newWords={analysis.new_words}
+                  />
+                )}
               </div>
             )}
           </>

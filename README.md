@@ -17,10 +17,10 @@ Then, in two terminals:
 
 ```
 make backend     # port 8016
-make frontend    # port 5183
+make frontend    # port 3005
 ```
 
-Open http://localhost:5183/, the frontend one. Needs `ANTHROPIC_API_KEY` in
+Open http://localhost:3005/, the frontend one. Needs `ANTHROPIC_API_KEY` in
 `.env` at the repo root.
 
 The frontend proxies `/api` to the backend (set in `frontend/vite.config.ts`),
@@ -108,7 +108,7 @@ let a four-word sentence count as much as a long one.
 - `backend/` — FastAPI server (port 8016). `main.py` wires up the routes, `db.py`
   owns all storage and arithmetic, `agent.py`/`test_agent.py` own the Claude calls.
   Nothing else in the app touches SQLite or Claude directly.
-- `frontend/` — React + Vite single-page app (port 5183). Talks to the backend
+- `frontend/` — React + Vite single-page app (port 3005). Talks to the backend
   through the `/api` proxy; no server-side rendering, no router, one page.
   Styled with Tailwind, so there's no stylesheet to speak of: `index.css` is
   the Tailwind import, the page background, and one keyframe.

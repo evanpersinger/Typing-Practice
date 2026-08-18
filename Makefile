@@ -1,7 +1,7 @@
 # Local dev shortcuts. Run each in its own terminal:
 #
 #   make backend    -> http://localhost:8016
-#   make frontend   -> http://localhost:5183   (the one you actually open)
+#   make frontend   -> http://localhost:3005   (the one you actually open)
 #
 # The two ports are coupled: the frontend proxies /api to the backend, and the
 # target is set in frontend/vite.config.ts. Change the backend port here and you
