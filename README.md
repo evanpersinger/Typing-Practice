@@ -16,12 +16,40 @@ make install
 Then, in two terminals:
 
 ```
-make backend     # port 8016
-make frontend    # port 3005
+make backend
+make frontend
 ```
 
-Open http://localhost:3005/, the frontend one. Needs `ANTHROPIC_API_KEY` in
-`.env` at the repo root.
+Open the URL the frontend dev server prints, not the backend one. Needs an API
+key in `.env` at the repo root, see below. Both ports are set in the `Makefile`.
+
+## Providers
+
+The two model calls run against either Anthropic or OpenAI. `LLM_PROVIDER` in
+`.env` picks which, and it defaults to `anthropic`, so leaving it out keeps the
+behaviour this app has always had.
+
+```
+ANTHROPIC_API_KEY=...
+OPENAI_API_KEY=...
+LLM_PROVIDER=openai
+```
+
+Only the key for the provider you're actually using has to be set. Pick one
+whose key is missing and the server names the variable it wants, rather than
+failing halfway through a session with whatever the SDK throws.
+
+The model per provider lives in `MODELS` in `backend/agent.py`. Both prompts are
+byte-identical either way; the only thing that differs is the SDK call that
+forces the structured output, and that branch lives in `_parse()` and nowhere
+else.
+
+The OpenAI side runs at reasoning effort `high`. That is not a preference. At
+lower effort the small models write the *misspelling* into the practice
+sentence, sometimes with the correct form in brackets after it, which is the
+exact opposite of what this app is for. High effort spends a lot more reasoning
+tokens, and those bill as output, so a cheap model here is less cheap than the
+price list suggests.
 
 The frontend proxies `/api` to the backend (set in `frontend/vite.config.ts`),
 so the browser only ever talks to one port and there's no CORS to configure.
@@ -36,8 +64,8 @@ time you load the page. Nothing is remembered, on purpose.
 |---|---|---|
 | database | `typing.db` | `typing_test.db` |
 | transcripts | `sessions/` | `sessions_test/` |
-| sentences | written by Claude, from your weak words | canned, fixed (`backend/test_agent.py`) |
-| analysis | Claude | canned |
+| sentences | written by the model, from your weak words | canned, fixed (`backend/test_agent.py`) |
+| analysis | the model | canned |
 | session start | 10-30s | instant |
 
 Separate files, not a flag on a row. Test data cannot reach your real numbers
@@ -105,10 +133,10 @@ let a four-word sentence count as much as a long one.
 
 ## Layout
 
-- `backend/` — FastAPI server (port 8016). `main.py` wires up the routes, `db.py`
-  owns all storage and arithmetic, `agent.py`/`test_agent.py` own the Claude calls.
-  Nothing else in the app touches SQLite or Claude directly.
-- `frontend/` — React + Vite single-page app (port 3005). Talks to the backend
+- `backend/` — FastAPI server. `main.py` wires up the routes, `db.py`
+  owns all storage and arithmetic, `agent.py`/`test_agent.py` own the model calls.
+  Nothing else in the app touches SQLite or a model directly.
+- `frontend/` — React + Vite single-page app. Talks to the backend
   through the `/api` proxy; no server-side rendering, no router, one page.
   Styled with Tailwind, so there's no stylesheet to speak of: `index.css` is
   the Tailwind import, the page background, and one keyframe.
@@ -121,7 +149,7 @@ let a four-word sentence count as much as a long one.
 backend/
   main.py        FastAPI: /drills, /stats, /results, /words. Picks the profile per request.
   db.py          All storage and all arithmetic. The agent never does math.
-  agent.py       The two Claude calls: write sentences, find the pattern.
+  agent.py       The two model calls: write sentences, find the pattern.
   test_agent.py  Same two functions, canned. Used by the testing profile.
 frontend/src/
   App.tsx        The whole UI: profile picker, practice, results, stats, words.

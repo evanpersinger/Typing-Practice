@@ -1,45 +1,113 @@
-"""The two Claude calls that run at the edges of a session.
+"""The two model calls that run at the edges of a session.
 
 Nothing here touches the keystroke loop, the app only calls these at session
 start (generate practice sentences) and session end (find the typo pattern and
-suggest new words). Swap MODEL to change which Claude model both calls use.
+suggest new words). Set LLM_PROVIDER in .env to pick which provider runs them.
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
+from typing import TypeVar
 
 from anthropic import Anthropic
 from dotenv import load_dotenv
+from openai import OpenAI
 from pydantic import BaseModel
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")  # picks up ANTHROPIC_API_KEY
+load_dotenv(BASE_DIR / ".env")  # picks up LLM_PROVIDER and both API keys
 
 """
-Model to use for Claude calls:
-Available model IDs (latest generation):
-claude-opus-4-8             Opus 4.8   - most capable, slowest, priciest
-claude-opus-4-6
-claude-sonnet-5             Sonnet 5   - strong all-rounder, good balance
-claude-fable-5              Fable 5    - Claude 5 family
-claude-haiku-4-5-20251001   Haiku 4.5  - fastest, cheapest, lightest
+Model each provider uses for both calls:
+
+Anthropic (latest generation):
+claude-opus-4-6            Opus 4.6  - most advance, most expensive
+claude-sonnet-5            Sonnet 5  - strong all-rounder, 
+claude-haiku-4-5-20251001  Haiku 4.5 - cheapest model
+
+OpenAI:
+gpt-5             full model, better prose, slower and pricier
+gpt-5-mini        middle option, closest match to Haiku
+gpt-5-nano        smallest and cheapest
 """
 
-MODEL = "claude-haiku-4-5-20251001"
+MODELS = {
+    "anthropic": "claude-haiku-4-5-20251001",
+    "openai": "gpt-5-nano",
+}
 
-_client: Anthropic | None = None
+# The env var each provider's SDK reads its key from. Checked up front so a
+# missing key says which one is missing, instead of surfacing as an SDK error
+# halfway through a session.
+KEY_VARS = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+}
+
+# Anthropic stays the default, so an existing .env keeps working untouched.
+PROVIDER = os.getenv("LLM_PROVIDER", "anthropic").strip().lower()
+
+_client: Anthropic | OpenAI | None = None
 
 
-def _get_client() -> Anthropic:
+def _get_client() -> Anthropic | OpenAI:
     """Build the client on first use so the server can boot without a key set."""
     global _client
     if _client is None:
-        _client = Anthropic()  # reads ANTHROPIC_API_KEY from the environment / .env
+        if PROVIDER not in MODELS:
+            raise RuntimeError(
+                f"LLM_PROVIDER is {PROVIDER!r}, expected one of {sorted(MODELS)}."
+            )
+        if not os.getenv(KEY_VARS[PROVIDER]):
+            raise RuntimeError(
+                f"LLM_PROVIDER is {PROVIDER!r} but {KEY_VARS[PROVIDER]} is not set. "
+                "Add it to .env at the repo root."
+            )
+        # Each SDK reads its own key from the environment.
+        _client = Anthropic() if PROVIDER == "anthropic" else OpenAI()
     return _client
 
 
-# structured output shapes (Claude is forced to return exactly these)
+T = TypeVar("T", bound=BaseModel)
+
+
+def _parse(prompt: str, max_tokens: int, output_format: type[T]) -> T:
+    """One structured-output call, forced into `output_format`.
+
+    The prompts are identical whichever provider is running, only the two SDKs'
+    parse methods differ, so the branch lives here and nowhere else.
+    """
+    client = _get_client()
+    model = MODELS[PROVIDER]
+
+    if isinstance(client, Anthropic):
+        response = client.messages.parse(
+            model=model,
+            max_tokens=max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+            output_format=output_format,
+        )
+        return response.parsed_output
+
+    # gpt-5 models spend output tokens reasoning before they write anything, so
+    # the cap that's comfortable for Claude can come back empty. High effort is
+    # what keeps the smaller models from writing the misspelling into the
+    # sentence, and the headroom covers what that reasoning costs.
+    response = client.responses.parse(
+        model=model,
+        max_output_tokens=max_tokens + 8000,
+        reasoning={"effort": "high"},
+        input=prompt,
+        text_format=output_format,
+    )
+    if response.output_parsed is None:
+        raise RuntimeError(f"{model} returned no parsed output (likely a refusal).")
+    return response.output_parsed
+
+
+# structured output shapes (the model is forced to return exactly these)
 
 class Drill(BaseModel):
     sentence: str
@@ -73,15 +141,7 @@ def generate_drills(words: list[str], count: int = 10) -> GeneratedDrills:
         "Keep them everyday and easy to read. "
         "For each item, list which of the target words it contains."
     )
-    response = _get_client().messages.parse(
-        model=MODEL,
-        max_tokens=1000,
-        messages=[
-            {"role": "user", 
-             "content": prompt}],
-        output_format=GeneratedDrills,
-    )
-    return response.parsed_output
+    return _parse(prompt, 1000, GeneratedDrills)
 
 
 # session end: find the pattern behind the misses
@@ -100,14 +160,4 @@ def analyze_session(misses: list[dict]) -> Analysis:
         "suggest up to 5 NEW words (not already in the list above) that fit the same "
         "weakness and would be good practice, each with a short reason."
     )
-    response = _get_client().messages.parse(
-        model=MODEL,
-        max_tokens=1500,
-        messages=[
-            {"role": "user",
-             "content": prompt}],
-        output_format=Analysis,
-    )
-    return response.parsed_output
-
-
+    return _parse(prompt, 1500, Analysis)
