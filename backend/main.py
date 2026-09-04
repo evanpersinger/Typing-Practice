@@ -70,14 +70,20 @@ MAX_WORD_LENGTH = 40
 
 # Free Type draws from the most common English words by measured usage, not from
 # a dictionary and not from a list anybody hand-picked. Short words are dropped,
-# nobody misspells "have". Reusing WORD_PATTERN is what guarantees a word this
-# serves can survive the round trip back through POST /words.
+# nobody misspells "have". Long ones are dropped so a row of them stays an even
+# width on the board the frontend draws; that costs 11 words out of ~1400. Reusing
+# WORD_PATTERN is what guarantees a word this serves can survive the round trip
+# back through POST /words.
 MIN_FREE_TYPE_LENGTH = 5
-FREE_TYPE_BATCH = 200
+MAX_FREE_TYPE_LENGTH = 11
+# One screen's worth: the frontend shows the whole response at once as 6 rows of
+# 10, and asks again when you've typed through it.
+FREE_TYPE_BOARD = 60
 FREE_TYPE_POOL = [
     word
     for word in top_n_list("en", 2000, ascii_only=True)
-    if len(word) >= MIN_FREE_TYPE_LENGTH and WORD_PATTERN.match(word)
+    if MIN_FREE_TYPE_LENGTH <= len(word) <= MAX_FREE_TYPE_LENGTH
+    and WORD_PATTERN.match(word)
 ]
 
 
@@ -133,7 +139,7 @@ def get_free_words(profile: Profile):
     """
     known = {row["word"] for row in db.get_all_words()}
     pool = [word for word in FREE_TYPE_POOL if word not in known]
-    return {"words": random.sample(pool, min(FREE_TYPE_BATCH, len(pool)))}
+    return {"words": random.sample(pool, min(FREE_TYPE_BOARD, len(pool)))}
 
 
 @app.post("/words")

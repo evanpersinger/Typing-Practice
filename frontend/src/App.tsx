@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useRef,
   useState,
@@ -33,6 +34,24 @@ type Tab = "practice" | "stats" | "words" | "free";
 // repeating straight away, so you're recalling it and not copying the line above.
 const STRIKES = 3;
 const REQUEUE_AFTER = 5;
+
+// The board: six words to a row, ten rows, the whole batch on screen at once.
+// Rows, not a grid of equal columns: a column wide enough for the longest word
+// strands a five-letter one in the middle of it. This way the rows come out
+// ragged and the words sit one space apart, the way a line of text reads. In a
+// mono face 1ch is exactly one character, so that gap really is one space.
+const FREE_COLUMNS = 6;
+const FREE_BOARD =
+  "flex w-fit flex-col gap-y-5 font-mono text-[1.6rem] leading-none";
+
+// A word you missed, and any character you got wrong inside the word you're on.
+// The same red the error line uses: nothing on the board is ever dimmed.
+const FREE_MISS = "text-[#ff7a70]";
+
+// Zero-width, so the caret moving through a word doesn't shove the rest of it
+// sideways: the 2px border is cancelled by the 1px margin on either side.
+const FREE_CARET =
+  "inline-block h-[1.05em] w-0 -mx-px border-l-2 border-white align-[-0.15em]";
 
 // Text buttons, not filled boxes: the size, colour and cursor used to come from
 // a global `button {}` rule, which is gone now, so they're stated here.
@@ -72,6 +91,52 @@ type Phase = "idle" | "loading" | "typing" | "submitting" | "done";
 // Free Type has no submit step: there's nothing to send at the end, words are
 // added the moment they earn it, so it goes straight from typing to done.
 type FreePhase = "idle" | "loading" | "typing" | "done";
+
+/**
+ * One word on the Free Type board.
+ *
+ * The word you're on is drawn character by character so what you typed sits on
+ * top of what you were meant to type: the caret marks where you are, and a
+ * character that doesn't match turns red. Every other word is just itself,
+ * red once you've missed it.
+ */
+function FreeWord({
+  word,
+  typed,
+  active,
+  missed,
+}: {
+  word: string;
+  typed: string;
+  active: boolean;
+  missed: boolean;
+}) {
+  if (!active) return <span className={missed ? FREE_MISS : ""}>{word}</span>;
+
+  // Anything past the end of the word is wrong by definition, so it renders as
+  // itself rather than being dropped: you should see what you actually typed.
+  const overflow = typed.slice(word.length);
+  return (
+    <span>
+      {[...word].map((char, i) => (
+        <Fragment key={i}>
+          {i === typed.length && <span className={FREE_CARET} />}
+          <span
+            className={
+              i < typed.length && typed[i].toLowerCase() !== char
+                ? FREE_MISS
+                : ""
+            }
+          >
+            {char}
+          </span>
+        </Fragment>
+      ))}
+      {overflow && <span className={FREE_MISS}>{overflow}</span>}
+      {typed.length >= word.length && <span className={FREE_CARET} />}
+    </span>
+  );
+}
 
 // Zero rather than a dash on an empty denominator: the stats tab always renders
 // its real shape, so you can see what the numbers will look like before you have
@@ -259,7 +324,12 @@ export default function App() {
   // practice session on purpose: these are bare words, not graded drills, and
   // letting the two touch is how a stray word ends up in your wpm.
   const [freePhase, setFreePhase] = useState<FreePhase>("idle");
-  const [freeQueue, setFreeQueue] = useState<string[]>([]);
+  // The board on screen, and where you are in it. Graded outcomes are indexed
+  // the same way, so `freeGraded[i]` is how `freeWords[i]` went; a word is only
+  // ever inserted ahead of the cursor, which is what keeps those in step.
+  const [freeWords, setFreeWords] = useState<string[]>([]);
+  const [freeIndex, setFreeIndex] = useState(0);
+  const [freeGraded, setFreeGraded] = useState<boolean[]>([]);
   const [freeCurrent, setFreeCurrent] = useState("");
   // Misses per word, this sitting only. Reset on every start: three strikes is
   // a claim about one session, not an all-time tally.
@@ -298,16 +368,21 @@ export default function App() {
 
   useEffect(() => {
     if (tab === "free" && freePhase === "typing") freeInputRef.current?.focus();
-  }, [tab, freePhase, freeQueue[0]]);
+  }, [tab, freePhase, freeIndex]);
 
-  // The batch is meant to outlast a sitting, but if you type through all of it,
-  // pull another rather than ending the session out from under you.
+  // Type through the board and the next one takes its place, rather than the
+  // session ending out from under you.
   useEffect(() => {
-    if (tab !== "free" || freePhase !== "typing" || freeQueue.length > 0) return;
+    if (tab !== "free" || freePhase !== "typing") return;
+    if (freeIndex < freeWords.length) return;
     fetchFreeWords()
-      .then(setFreeQueue)
+      .then((words) => {
+        setFreeWords(words);
+        setFreeIndex(0);
+        setFreeGraded([]);
+      })
       .catch(() => setError("Could not load more words."));
-  }, [tab, freePhase, freeQueue.length]);
+  }, [tab, freePhase, freeIndex, freeWords.length]);
 
   /** Wipe every trace of the last session. Whoever clears state, clears all of
    *  it: a stale `results` or a running clock leaking into the next session is
@@ -328,7 +403,9 @@ export default function App() {
    *  leftover miss count is a word added on its first mistake next time. */
   function resetFreeType() {
     setFreePhase("idle");
-    setFreeQueue([]);
+    setFreeWords([]);
+    setFreeIndex(0);
+    setFreeGraded([]);
     setFreeCurrent("");
     setFreeMisses({});
     setFreeAdded([]);
@@ -489,7 +566,7 @@ export default function App() {
         return;
       }
       resetFreeType();
-      setFreeQueue(words);
+      setFreeWords(words);
       setFreePhase("typing");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not reach the backend.");
@@ -498,38 +575,41 @@ export default function App() {
   }
 
   /**
-   * Grade one word and move on.
+   * Grade the word you're on and move the cursor along.
    *
-   * Right, and it's done, off the queue for good. Wrong, and it goes back in
-   * further down. On the third miss it's added to your weak list and dropped,
-   * because Practice takes over from there and there's nothing left to learn
-   * from testing it again this sitting.
+   * Right, and it's done for good. Wrong, and it's dealt back into the board
+   * further down, pushing the last word off so the board stays six rows. On the
+   * third miss it's added to your weak list instead, because Practice takes
+   * over from there and there's nothing left to learn from testing it again
+   * this sitting.
    */
-  async function submitFreeWord() {
-    const word = freeQueue[0];
+  async function commitFreeWord() {
+    const word = freeWords[freeIndex];
     if (!word) return;
-    const attempt = normalize(freeCurrent);
+    const correct = normalize(freeCurrent) === word;
     setFreeCurrent("");
     setFreeTypedCount((n) => n + 1);
-
-    if (attempt === word) {
-      setFreeQueue((queue) => queue.slice(1));
-      return;
-    }
+    setFreeIndex((i) => i + 1);
+    setFreeGraded((graded) => [...graded, correct]);
+    if (correct) return;
 
     const misses = (freeMisses[word] ?? 0) + 1;
     setFreeMisses({ ...freeMisses, [word]: misses });
 
     if (misses < STRIKES) {
-      setFreeQueue((queue) => {
-        const rest = queue.slice(1);
-        rest.splice(REQUEUE_AFTER, 0, word);
-        return rest;
+      setFreeWords((words) => {
+        // Too near the end of the board to deal it back in. The next board is
+        // different words anyway, so it just doesn't come round again.
+        const at = freeIndex + REQUEUE_AFTER;
+        if (at >= words.length) return words;
+        const next = [...words];
+        next.splice(at, 0, word);
+        next.pop();
+        return next;
       });
       return;
     }
 
-    setFreeQueue((queue) => queue.slice(1));
     try {
       await addWord(word);
       setFreeAdded((added) => [...added, word]);
@@ -538,10 +618,14 @@ export default function App() {
     }
   }
 
+  /** Space ends a word here, the way it does when you type anything else, so it
+   *  must never reach the box. Enter does the same for the last word of a line
+   *  out of habit. An empty box submits nothing: a stray space isn't a miss. */
   function handleFreeKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== "Enter") return;
+    if (e.key !== " " && e.key !== "Enter") return;
     e.preventDefault();
-    void submitFreeWord();
+    if (freeCurrent.trim() === "") return;
+    void commitFreeWord();
   }
 
   /** Pull up one past session's recap. Clears the old one first so switching
@@ -638,6 +722,16 @@ export default function App() {
   // a glance. Past 60 the extra words aren't shown — the board is the board.
   const shownWeak = weak.slice(0, WORD_SLOTS);
 
+  // Ten to a row. The index rides along because it's what everything else keys
+  // off: where the cursor is, and how each word was graded.
+  const freeRows = Array.from(
+    { length: Math.ceil(freeWords.length / FREE_COLUMNS) },
+    (_, row) =>
+      freeWords
+        .slice(row * FREE_COLUMNS, (row + 1) * FREE_COLUMNS)
+        .map((word, col) => ({ word, index: row * FREE_COLUMNS + col })),
+  );
+
   // Row-major, padded with null so the board stays 6 by 10 even with two words.
   const wordRows = Array.from({ length: WORD_ROWS }, (_, row) =>
     Array.from(
@@ -660,9 +754,13 @@ export default function App() {
         ? // Stats reads like a page, not a prompt, so it starts top-left.
           "m-0 w-full max-w-[880px] self-start"
         : tab === "free"
-          ? freePhase === "idle" || freePhase === "loading"
-            ? "mx-auto my-0 w-full max-w-[880px] self-start"
-            : "m-auto w-full max-w-[880px]"
+          ? freePhase === "typing"
+            ? // The board sizes itself to its widest row, so the card takes its
+              // width from the board rather than the usual reading cap.
+              "m-auto"
+            : freePhase === "done"
+              ? "m-auto w-full max-w-[880px]"
+              : "mx-auto my-0 w-full max-w-[880px] self-start"
           : phase === "idle" || phase === "loading"
           ? // The start screen is two short lines; centering them leaves the
             // button floating in an empty page, so it pins to the top.
@@ -853,16 +951,32 @@ export default function App() {
               </>
             )}
 
-            {freePhase === "typing" && freeQueue[0] && (
-              <>
-                {/* Same size and face as the Practice prompt, so switching
-                    between the two modes doesn't change how you read. */}
-                <p className="mb-4 font-mono text-[1.9rem] leading-[1.6]">
-                  {freeQueue[0]}
-                </p>
+            {freePhase === "typing" && (
+              // Clicking anywhere on the board puts the cursor back, since the
+              // input catching your keystrokes is off screen.
+              <div onClick={() => freeInputRef.current?.focus()}>
+                <div className={FREE_BOARD}>
+                  {freeRows.map((row, rowIndex) => (
+                    <div key={rowIndex} className="flex gap-x-[1ch]">
+                      {row.map(({ word, index }) => (
+                        <FreeWord
+                          key={index}
+                          word={word}
+                          typed={index === freeIndex ? freeCurrent : ""}
+                          active={index === freeIndex}
+                          missed={
+                            index < freeGraded.length && !freeGraded[index]
+                          }
+                        />
+                      ))}
+                    </div>
+                  ))}
+                </div>
+                {/* Off screen on purpose: what you type is drawn into the board
+                    itself, so a second copy of it in a box is just noise. */}
                 <input
                   ref={freeInputRef}
-                  className="w-full rounded-lg border border-[#4a4f4c] bg-[#1e2220] px-4.5 py-4 font-mono text-[1.9rem] text-white outline-none placeholder:text-[#7d827e] focus:border-white"
+                  className="sr-only"
                   value={freeCurrent}
                   onChange={(e) => setFreeCurrent(e.target.value)}
                   onKeyDown={handleFreeKeyDown}
@@ -870,27 +984,16 @@ export default function App() {
                   autoCorrect="off"
                   spellCheck={false}
                 />
-                <div className="mt-5 flex items-center gap-8">
+                <div className="mt-9 flex justify-center">
                   <button
                     className="cursor-pointer rounded-lg border border-white px-8 py-3.5 text-[1.4rem] text-white no-underline hover:bg-white/8"
                     onClick={() => setFreePhase("done")}
                   >
                     Stop
                   </button>
-                  {/* A running count, not a score. Naming the word you just
-                      missed would turn this into a test. */}
-                  <span className="text-[1.2rem]">
-                    {freeTypedCount} typed, {freeAdded.length} added
-                  </span>
                 </div>
                 {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}
-              </>
-            )}
-
-            {/* The batch ran dry and the next one is in flight. Rare, it takes
-                200 words to get here. */}
-            {freePhase === "typing" && !freeQueue[0] && (
-              <p className="text-[1.9rem]">Loading more words…</p>
+              </div>
             )}
 
             {freePhase === "done" && (
