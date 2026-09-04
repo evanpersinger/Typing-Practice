@@ -4,12 +4,14 @@ FastAPI app wiring the local trainer together.
 
 from __future__ import annotations
 
+import random
 import re
 from contextlib import asynccontextmanager
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel
+from wordfreq import top_n_list
 
 from backend import agent, db, test_agent
 
@@ -66,6 +68,19 @@ WORD_PATTERN = re.compile(r"^[a-z][a-z'-]*$")
 MAX_WORD_LENGTH = 40
 
 
+# Free Type draws from the most common English words by measured usage, not from
+# a dictionary and not from a list anybody hand-picked. Short words are dropped,
+# nobody misspells "have". Reusing WORD_PATTERN is what guarantees a word this
+# serves can survive the round trip back through POST /words.
+MIN_FREE_TYPE_LENGTH = 5
+FREE_TYPE_BATCH = 200
+FREE_TYPE_POOL = [
+    word
+    for word in top_n_list("en", 2000, ascii_only=True)
+    if len(word) >= MIN_FREE_TYPE_LENGTH and WORD_PATTERN.match(word)
+]
+
+
 class WordResult(BaseModel):
     word: str
     typed: str
@@ -105,6 +120,20 @@ def get_drills(profile: Profile):
         return {"words": [], "drills": []}
     generated = agent.generate_drills(words)
     return {"words": words, "drills": [d.model_dump() for d in generated.drills]}
+
+
+@app.get("/free-words")
+def get_free_words(profile: Profile):
+    """Free Type: common words to fish for weaknesses you don't know about yet.
+
+    Words already on your list are filtered out. Re-drilling a known weak word is
+    what Practice is for; this mode is only looking for new ones. Nothing here
+    writes: a word only earns its place by being missed three times, and the
+    frontend adds it through POST /words like any other.
+    """
+    known = {row["word"] for row in db.get_all_words()}
+    pool = [word for word in FREE_TYPE_POOL if word not in known]
+    return {"words": random.sample(pool, min(FREE_TYPE_BATCH, len(pool)))}
 
 
 @app.post("/words")

@@ -102,6 +102,15 @@ export async function fetchDrills(): Promise<DrillsResponse> {
   return res.json();
 }
 
+/** Free Type's word pool. Plain strings, not drills: there's no sentence to
+ *  grade against and no target words to pick out, just the word itself. */
+export async function fetchFreeWords(): Promise<string[]> {
+  const res = await fetch(`${API_BASE}/free-words`, { headers: headers() });
+  if (!res.ok) throw new Error(`Failed to load words (${res.status})`);
+  const data = await res.json();
+  return data.words;
+}
+
 export async function fetchStats(): Promise<StatsResponse> {
   const res = await fetch(`${API_BASE}/stats`, { headers: headers() });
   if (!res.ok) throw new Error(`Failed to load stats (${res.status})`);

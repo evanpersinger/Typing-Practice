@@ -9,6 +9,7 @@ dependencies = [
     "anthropic",
     "openai",
     "python-dotenv",
+    "wordfreq",
 ]
 
 [tool.uv]

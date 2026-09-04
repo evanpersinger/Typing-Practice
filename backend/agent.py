@@ -91,10 +91,10 @@ def _parse(prompt: str, max_tokens: int, output_format: type[T]) -> T:
         )
         return response.parsed_output
 
-    # gpt-5 models spend output tokens reasoning before they write anything, so
-    # the cap that's comfortable for Claude can come back empty. High effort is
-    # what keeps the smaller models from writing the misspelling into the
-    # sentence, and the headroom covers what that reasoning costs.
+    # High effort is what stops the smaller models writing the misspelling into
+    # the practice sentence, and the headroom covers what that reasoning costs:
+    # these models spend output tokens thinking before they write anything, so
+    # the cap that's comfortable for Claude comes back empty.
     response = client.responses.parse(
         model=model,
         max_output_tokens=max_tokens + 8000,

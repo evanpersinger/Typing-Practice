@@ -8,6 +8,7 @@ import {
 import {
   addWord,
   fetchDrills,
+  fetchFreeWords,
   fetchSessionDetail,
   fetchSessions,
   fetchStats,
@@ -23,9 +24,15 @@ import {
   type TypingStats,
   type WordResult,
 } from "./api";
-import { gradeDrill } from "./grade";
+import { gradeDrill, normalize } from "./grade";
 
-type Tab = "practice" | "stats" | "words";
+type Tab = "practice" | "stats" | "words" | "free";
+
+// Miss a word twice and it's a typo; three times and it's a habit worth adding
+// to the weak list. A missed word slides this far down the queue rather than
+// repeating straight away, so you're recalling it and not copying the line above.
+const STRIKES = 3;
+const REQUEUE_AFTER = 5;
 
 // Text buttons, not filled boxes: the size, colour and cursor used to come from
 // a global `button {}` rule, which is gone now, so they're stated here.
@@ -61,6 +68,10 @@ const WORD_SLOTS = WORD_COLUMNS * WORD_ROWS;
 // row squeezes the board and clips words).
 const WORD_TABLE_WIDTH = "w-[1095px] shrink-0";
 type Phase = "idle" | "loading" | "typing" | "submitting" | "done";
+
+// Free Type has no submit step: there's nothing to send at the end, words are
+// added the moment they earn it, so it goes straight from typing to done.
+type FreePhase = "idle" | "loading" | "typing" | "done";
 
 // Zero rather than a dash on an empty denominator: the stats tab always renders
 // its real shape, so you can see what the numbers will look like before you have
@@ -244,6 +255,18 @@ export default function App() {
   // list" is an outcome, not a failure, and shouldn't render in red.
   const [wordNote, setWordNote] = useState<string | null>(null);
 
+  // Free Type keeps its own phase, queue and counters. It shares nothing with a
+  // practice session on purpose: these are bare words, not graded drills, and
+  // letting the two touch is how a stray word ends up in your wpm.
+  const [freePhase, setFreePhase] = useState<FreePhase>("idle");
+  const [freeQueue, setFreeQueue] = useState<string[]>([]);
+  const [freeCurrent, setFreeCurrent] = useState("");
+  // Misses per word, this sitting only. Reset on every start: three strikes is
+  // a claim about one session, not an all-time tally.
+  const [freeMisses, setFreeMisses] = useState<Record<string, number>>({});
+  const [freeAdded, setFreeAdded] = useState<string[]>([]);
+  const [freeTypedCount, setFreeTypedCount] = useState(0);
+
   // Clock for the sentence on screen. Nothing displays it any more, but it's
   // still what wpm is computed from, so it has to stay honest: it counts only
   // time you spent actually typing, starting on your first keystroke rather
@@ -267,10 +290,24 @@ export default function App() {
   // Put the cursor back in the box on a new sentence and on returning from the
   // Stats tab, otherwise you come back mid-sentence and type into nothing.
   const inputRef = useRef<HTMLInputElement>(null);
+  const freeInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (tab === "practice" && phase === "typing") inputRef.current?.focus();
   }, [tab, phase, index]);
+
+  useEffect(() => {
+    if (tab === "free" && freePhase === "typing") freeInputRef.current?.focus();
+  }, [tab, freePhase, freeQueue[0]]);
+
+  // The batch is meant to outlast a sitting, but if you type through all of it,
+  // pull another rather than ending the session out from under you.
+  useEffect(() => {
+    if (tab !== "free" || freePhase !== "typing" || freeQueue.length > 0) return;
+    fetchFreeWords()
+      .then(setFreeQueue)
+      .catch(() => setError("Could not load more words."));
+  }, [tab, freePhase, freeQueue.length]);
 
   /** Wipe every trace of the last session. Whoever clears state, clears all of
    *  it: a stale `results` or a running clock leaking into the next session is
@@ -287,6 +324,17 @@ export default function App() {
     resetClock();
   }
 
+  /** Same rule as resetSession: whoever clears Free Type clears all of it. A
+   *  leftover miss count is a word added on its first mistake next time. */
+  function resetFreeType() {
+    setFreePhase("idle");
+    setFreeQueue([]);
+    setFreeCurrent("");
+    setFreeMisses({});
+    setFreeAdded([]);
+    setFreeTypedCount(0);
+  }
+
   function chooseProfile(next: Profile) {
     setProfile(next); // every request from here on carries this profile
     setActiveProfile(next);
@@ -298,6 +346,7 @@ export default function App() {
     setSelectedSessionId("");
     setSessionDetail(null);
     resetSession();
+    resetFreeType();
   }
 
   /** Back to the picker. Stats and session state are dropped on the way out, or
@@ -312,6 +361,7 @@ export default function App() {
     setSelectedSessionId("");
     setSessionDetail(null);
     resetSession();
+    resetFreeType();
   }
 
   async function startSession() {
@@ -418,6 +468,80 @@ export default function App() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not add that word.");
     }
+  }
+
+  /** Open the tab without starting anything, same as Practice. Switching tabs
+   *  mid-thought shouldn't begin a session you didn't ask for. */
+  function openFreeType() {
+    stopClock(); // free typing isn't practice time, don't let it count
+    setTab("free");
+    setError(null);
+  }
+
+  async function startFreeType() {
+    setError(null);
+    setFreePhase("loading");
+    try {
+      const words = await fetchFreeWords();
+      if (words.length === 0) {
+        setError("No words came back. Every common word is already on your list.");
+        setFreePhase("idle");
+        return;
+      }
+      resetFreeType();
+      setFreeQueue(words);
+      setFreePhase("typing");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not reach the backend.");
+      setFreePhase("idle");
+    }
+  }
+
+  /**
+   * Grade one word and move on.
+   *
+   * Right, and it's done, off the queue for good. Wrong, and it goes back in
+   * further down. On the third miss it's added to your weak list and dropped,
+   * because Practice takes over from there and there's nothing left to learn
+   * from testing it again this sitting.
+   */
+  async function submitFreeWord() {
+    const word = freeQueue[0];
+    if (!word) return;
+    const attempt = normalize(freeCurrent);
+    setFreeCurrent("");
+    setFreeTypedCount((n) => n + 1);
+
+    if (attempt === word) {
+      setFreeQueue((queue) => queue.slice(1));
+      return;
+    }
+
+    const misses = (freeMisses[word] ?? 0) + 1;
+    setFreeMisses({ ...freeMisses, [word]: misses });
+
+    if (misses < STRIKES) {
+      setFreeQueue((queue) => {
+        const rest = queue.slice(1);
+        rest.splice(REQUEUE_AFTER, 0, word);
+        return rest;
+      });
+      return;
+    }
+
+    setFreeQueue((queue) => queue.slice(1));
+    try {
+      await addWord(word);
+      setFreeAdded((added) => [...added, word]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : `Could not add ${word}.`);
+    }
+  }
+
+  function handleFreeKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    void submitFreeWord();
   }
 
   /** Pull up one past session's recap. Clears the old one first so switching
@@ -535,7 +659,11 @@ export default function App() {
       : tab === "stats"
         ? // Stats reads like a page, not a prompt, so it starts top-left.
           "m-0 w-full max-w-[880px] self-start"
-        : phase === "idle" || phase === "loading"
+        : tab === "free"
+          ? freePhase === "idle" || freePhase === "loading"
+            ? "mx-auto my-0 w-full max-w-[880px] self-start"
+            : "m-auto w-full max-w-[880px]"
+          : phase === "idle" || phase === "loading"
           ? // The start screen is two short lines; centering them leaves the
             // button floating in an empty page, so it pins to the top.
             "mx-auto my-0 w-full max-w-[880px] self-start"
@@ -581,6 +709,12 @@ export default function App() {
           Practice
         </button>
         <button
+          className={tab === "free" ? TAB_ON : TAB_OFF}
+          onClick={openFreeType}
+        >
+          Free Type
+        </button>
+        <button
           className={tab === "stats" ? TAB_ON : TAB_OFF}
           onClick={openStats}
         >
@@ -612,7 +746,7 @@ export default function App() {
             {phase === "idle" && (
               <>
                 <button
-                  className="cursor-pointer rounded-[10px] border border-white px-13 py-6 text-[2.4rem] text-white no-underline hover:bg-white/8"
+                  className="cursor-pointer rounded-[10px] border border-white px-20 py-9 text-[3.2rem] text-white no-underline hover:bg-white/8"
                   onClick={startSession}
                 >
                   Start session
@@ -693,6 +827,91 @@ export default function App() {
                     newWords={analysis.new_words}
                   />
                 )}
+              </div>
+            )}
+          </>
+        )}
+
+        {tab === "free" && (
+          <>
+            {freePhase === "idle" && (
+              <>
+                <button
+                  className="cursor-pointer rounded-[10px] border border-white px-20 py-9 text-[3.2rem] text-white no-underline hover:bg-white/8"
+                  onClick={startFreeType}
+                >
+                  Start
+                </button>
+                {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}
+              </>
+            )}
+
+            {freePhase === "loading" && (
+              <>
+                <p className="mt-0 mb-7 text-[2.4rem]">Loading words…</p>
+                <div className="size-11 animate-[spin_0.8s_linear_infinite] rounded-full border-[3px] border-transparent border-t-white" />
+              </>
+            )}
+
+            {freePhase === "typing" && freeQueue[0] && (
+              <>
+                {/* Same size and face as the Practice prompt, so switching
+                    between the two modes doesn't change how you read. */}
+                <p className="mb-4 font-mono text-[1.9rem] leading-[1.6]">
+                  {freeQueue[0]}
+                </p>
+                <input
+                  ref={freeInputRef}
+                  className="w-full rounded-lg border border-[#4a4f4c] bg-[#1e2220] px-4.5 py-4 font-mono text-[1.9rem] text-white outline-none placeholder:text-[#7d827e] focus:border-white"
+                  value={freeCurrent}
+                  onChange={(e) => setFreeCurrent(e.target.value)}
+                  onKeyDown={handleFreeKeyDown}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
+                <div className="mt-5 flex items-center gap-8">
+                  <button
+                    className="cursor-pointer rounded-lg border border-white px-8 py-3.5 text-[1.4rem] text-white no-underline hover:bg-white/8"
+                    onClick={() => setFreePhase("done")}
+                  >
+                    Stop
+                  </button>
+                  {/* A running count, not a score. Naming the word you just
+                      missed would turn this into a test. */}
+                  <span className="text-[1.2rem]">
+                    {freeTypedCount} typed, {freeAdded.length} added
+                  </span>
+                </div>
+                {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}
+              </>
+            )}
+
+            {/* The batch ran dry and the next one is in flight. Rare, it takes
+                200 words to get here. */}
+            {freePhase === "typing" && !freeQueue[0] && (
+              <p className="text-[1.9rem]">Loading more words…</p>
+            )}
+
+            {freePhase === "done" && (
+              <div className="flex flex-col gap-7 leading-[1.6]">
+                <h1 className="m-0 text-[2.4rem]">Free type finished</h1>
+                <p className="m-0 text-[1.3rem]">
+                  {freeTypedCount} typed, {freeAdded.length} added to your list.
+                </p>
+                {freeAdded.length > 0 && (
+                  <ul className="m-0 flex list-none flex-col gap-1 p-0 font-mono text-[1.3rem]">
+                    {freeAdded.map((word) => (
+                      <li key={word}>{word}</li>
+                    ))}
+                  </ul>
+                )}
+                <button
+                  className={`${TEXT_BUTTON} self-start underline underline-offset-4`}
+                  onClick={startFreeType}
+                >
+                  Go again
+                </button>
               </div>
             )}
           </>

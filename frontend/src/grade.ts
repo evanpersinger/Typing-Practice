@@ -1,7 +1,7 @@
 import type { Drill, WordResult } from "./api";
 
 /** Lowercase and strip surrounding punctuation so "Separate," == "separate". */
-function normalize(word: string): string {
+export function normalize(word: string): string {
   return word.toLowerCase().replace(/^[^a-z0-9']+|[^a-z0-9']+$/g, "");
 }
 
