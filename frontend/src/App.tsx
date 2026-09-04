@@ -64,6 +64,14 @@ const TAB = `${TEXT_BUTTON} border-b-2 py-0.5 no-underline`;
 const TAB_ON = `${TAB} border-white font-semibold`;
 const TAB_OFF = `${TAB} border-transparent`;
 
+// What the mode you're on is for, and what you do. Pinned to the top-left
+// corner opposite the profile button, so it reads as a label on the screen
+// rather than something standing between you and the Start button.
+// Same size as the tab bar: it's chrome sitting in a corner, not body text.
+// The width cap is what keeps it clear of the Start button on the card behind.
+const INTRO =
+  "absolute top-7 left-10 m-0 max-w-[280px] text-[1.3rem] leading-[1.45]";
+
 // Section headings: separated from body text by weight and size alone, never by
 // dimming. Every bit of text on these pages stays pure white.
 const HEADING = "mt-0 mb-2.5 text-[1.1rem] font-semibold";
@@ -773,6 +781,16 @@ export default function App() {
             // anything taller than the viewport.
             "m-auto w-full max-w-[880px]";
 
+  // Each mode says its own piece, and only while you're not typing: mid-sentence
+  // it's one more thing on screen competing with the words. Off the typing
+  // screen it's always there, so it can't go missing on the tab you came back to.
+  const intro =
+    tab === "practice" && phase !== "typing"
+      ? "Sentences written around the words you misspell most often. Type each one exactly as it appears, and at the end you get told what your mistakes have in common."
+      : tab === "free" && freePhase !== "typing"
+        ? "Common English words you haven't flagged yet, here to catch the ones you didn't know you were getting wrong. Type each word and press space; miss the same word three times and it joins your weak list."
+        : null;
+
   if (profile === null) {
     return (
       <div className="m-auto w-full max-w-[880px]">
@@ -800,6 +818,8 @@ export default function App() {
 
   return (
     <>
+      {intro && <p className={INTRO}>{intro}</p>}
+
       {/* Absolute, not fixed, so it scrolls away over a long stats table
           instead of floating on top of it. */}
       <nav className="absolute top-7 left-1/2 flex -translate-x-1/2 gap-6">
