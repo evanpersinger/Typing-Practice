@@ -45,8 +45,13 @@ const FREE_BOARD =
   "px-10 py-8 font-mono text-[1.6rem] leading-none";
 
 // A letter you got wrong, anywhere on the board. The same red the error line
-// uses: nothing on the board is ever dimmed.
+// uses.
 const FREE_MISS = "text-[#ff7a70]";
+
+// A letter you haven't reached yet. White is what you've already typed, so the
+// board fills in ahead of the caret as you go. Same grey as the input
+// placeholder, for the same reason: it reads as text that isn't yours yet.
+const FREE_PENDING = "text-[#7d827e]";
 
 // Zero-width, so the caret moving through a word doesn't shove the rest of it
 // sideways: the 2px border is cancelled by the 1px margin on either side.
@@ -131,7 +136,7 @@ function FreeWord({
   typed: string | null;
   active: boolean;
 }) {
-  if (typed === null) return <span>{word}</span>;
+  if (typed === null) return <span className={FREE_PENDING}>{word}</span>;
 
   const attempt = typed.toLowerCase();
   const letters = [...word];
@@ -143,13 +148,17 @@ function FreeWord({
   // Anything past the end of the word renders as itself rather than being
   // dropped: you should see what you actually typed.
   const overflow = attempt.slice(word.length);
+  // Only the word under the caret has letters that are still pending: on a word
+  // you've moved past, everything you never reached is already marked wrong.
+  const letterClass = (i: number) =>
+    wrong[i] ? FREE_MISS : i < attempt.length ? "" : FREE_PENDING;
 
   return (
     <span>
       {letters.map((char, i) => (
         <Fragment key={i}>
           {active && i === attempt.length && <span className={FREE_CARET} />}
-          <span className={wrong[i] ? FREE_MISS : ""}>{char}</span>
+          <span className={letterClass(i)}>{char}</span>
         </Fragment>
       ))}
       {overflow && <span className={FREE_MISS}>{overflow}</span>}
