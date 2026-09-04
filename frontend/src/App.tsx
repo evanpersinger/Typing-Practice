@@ -59,10 +59,26 @@ const FREE_CARET =
 const TEXT_BUTTON =
   "cursor-pointer text-[1.3rem] text-white hover:opacity-[0.55]";
 
-// Shared by the four nav buttons, which differ only in the active state.
-const TAB = `${TEXT_BUTTON} border-b-2 py-0.5 no-underline`;
-const TAB_ON = `${TAB} border-white font-semibold`;
-const TAB_OFF = `${TAB} border-transparent`;
+// The four nav buttons. Boxes rather than underlined text, so the active one is
+// a faint fill instead of a border: the border is on all four now. Only the
+// inactive ones take a hover fill, since two bg utilities on one element resolve
+// by stylesheet order and the active tab would flicker lighter on hover.
+// Warm sand rather than white, so the chrome you navigate with never reads as
+// the words you're being tested on. The literal has to be written out at each
+// use: Tailwind scans the source for class strings, so a colour interpolated
+// from a variable never gets a rule generated for it.
+const TAB =
+  "cursor-pointer rounded-lg border border-[#c2a878] px-6 py-2.5 " +
+  "text-[1.8rem] text-[#c2a878] no-underline";
+const TAB_ON = `${TAB} bg-[#c2a878]/15`;
+const TAB_OFF = `${TAB} hover:bg-[#c2a878]/8`;
+
+// The way out of whichever session you're in. Pinned to the bottom-right so it
+// sits opposite the intro blurb and out of the way of the words: a way out, not
+// an invitation.
+const END_BUTTON =
+  "absolute right-10 bottom-7 cursor-pointer rounded-lg border border-white " +
+  "px-8 py-3.5 text-[1.4rem] text-white no-underline hover:bg-white/8";
 
 // What the mode you're on is for, and what you do. Pinned to the corner opposite
 // the profile button and sized like the tab bar, because it's chrome rather than
@@ -787,6 +803,13 @@ export default function App() {
   // Each mode says its own piece, and only while you're not typing: mid-sentence
   // it's one more thing on screen competing with the words. Off the typing
   // screen it's always there, so it can't go missing on the tab you came back to.
+  const endTyping =
+    tab === "practice" && phase === "typing"
+      ? endSession
+      : tab === "free" && freePhase === "typing"
+        ? () => setFreePhase("done")
+        : null;
+
   const intro =
     tab === "practice" && phase !== "typing"
       ? "Sentences written around the words you misspell most often. Type each one exactly as it appears, and at the end you get told what your mistakes have in common."
@@ -822,6 +845,12 @@ export default function App() {
   return (
     <>
       {intro && <p className={INTRO}>{intro}</p>}
+
+      {endTyping && (
+        <button className={END_BUTTON} onClick={endTyping}>
+          End session
+        </button>
+      )}
 
       {/* Absolute, not fixed, so it scrolls away over a long stats table
           instead of floating on top of it. */}
@@ -899,12 +928,13 @@ export default function App() {
                 <p className="mb-4 font-mono text-[1.9rem] leading-[1.6]">
                   {drills[index].sentence}
                 </p>
-                {/* Off screen, not gone: it still catches every keystroke,
-                    there just isn't a box on the page any more. */}
+                {/* No box around it, just the line you're writing under the
+                    one you're copying. Same face and size as the sentence, so
+                    the two read as one block instead of a form. */}
                 <input
                   key={index}
                   ref={inputRef}
-                  className="sr-only"
+                  className="w-full border-0 bg-transparent p-0 font-mono text-[1.9rem] text-white outline-none"
                   value={current}
                   onChange={handleChange}
                   onKeyDown={handleKeyDown}
@@ -912,14 +942,6 @@ export default function App() {
                   autoCorrect="off"
                   spellCheck={false}
                 />
-                {/* A way out, not an invitation. Small, so it never competes
-                    with the sentence you're supposed to be reading. */}
-                <button
-                  className="mt-5 cursor-pointer rounded-lg border border-white px-8 py-3.5 text-[1.4rem] text-white no-underline hover:bg-white/8"
-                  onClick={endSession}
-                >
-                  End session
-                </button>
                 {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}
               </>
             )}
@@ -1013,14 +1035,6 @@ export default function App() {
                   autoCorrect="off"
                   spellCheck={false}
                 />
-                <div className="mt-9 flex justify-center">
-                  <button
-                    className="cursor-pointer rounded-lg border border-white px-8 py-3.5 text-[1.4rem] text-white no-underline hover:bg-white/8"
-                    onClick={() => setFreePhase("done")}
-                  >
-                    Stop
-                  </button>
-                </div>
                 {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}
               </div>
             )}
