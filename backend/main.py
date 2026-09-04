@@ -69,15 +69,15 @@ MAX_WORD_LENGTH = 40
 
 
 # Free Type draws from the most common English words by measured usage, not from
-# a dictionary and not from a list anybody hand-picked. Short words are dropped,
-# nobody misspells "have". Long ones are dropped so a row of them stays an even
-# width on the board the frontend draws; that costs 11 words out of ~1400. Reusing
-# WORD_PATTERN is what guarantees a word this serves can survive the round trip
-# back through POST /words.
+# a dictionary and not from a list anybody hand-picked. Both length bounds are
+# about the board: nobody misspells "have", and a long word makes a row of them
+# lopsided. That costs 11 words out of ~1400. Reusing WORD_PATTERN is what
+# guarantees a word this serves can survive the round trip back through
+# POST /words.
 MIN_FREE_TYPE_LENGTH = 5
 MAX_FREE_TYPE_LENGTH = 11
-# One screen's worth: the frontend shows the whole response at once as 6 rows of
-# 10, and asks again when you've typed through it.
+# One screen's worth: the frontend shows the whole response at once as ten rows
+# of six, and asks again when you've typed through it.
 FREE_TYPE_BOARD = 60
 FREE_TYPE_POOL = [
     word

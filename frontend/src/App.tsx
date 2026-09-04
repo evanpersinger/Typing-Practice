@@ -30,16 +30,15 @@ import { gradeDrill, normalize } from "./grade";
 type Tab = "practice" | "stats" | "words" | "free";
 
 // Miss a word twice and it's a typo; three times and it's a habit worth adding
-// to the weak list. A missed word slides this far down the queue rather than
+// to the weak list. A missed word slides this far down the board rather than
 // repeating straight away, so you're recalling it and not copying the line above.
 const STRIKES = 3;
 const REQUEUE_AFTER = 5;
 
-// The board: six words to a row, ten rows, the whole batch on screen at once.
-// Rows, not a grid of equal columns: a column wide enough for the longest word
-// strands a five-letter one in the middle of it. This way the rows come out
-// ragged and the words sit one space apart, the way a line of text reads. In a
-// mono face 1ch is exactly one character, so that gap really is one space.
+// Six words to a row, the whole batch on screen at once. Rows rather than a
+// grid of equal columns, because a column wide enough for the longest word
+// strands a five-letter one in the middle of it: this way the rows come out
+// ragged and the words sit exactly one space apart (1ch, in a mono face).
 const FREE_COLUMNS = 6;
 const FREE_BOARD =
   "flex w-fit flex-col gap-y-5 font-mono text-[1.6rem] leading-none";
@@ -59,16 +58,14 @@ const FREE_CARET =
 const TEXT_BUTTON =
   "cursor-pointer text-[1.3rem] text-white hover:opacity-[0.55]";
 
-// Shared by the three nav buttons, which differ only in the active state.
+// Shared by the four nav buttons, which differ only in the active state.
 const TAB = `${TEXT_BUTTON} border-b-2 py-0.5 no-underline`;
 const TAB_ON = `${TAB} border-white font-semibold`;
 const TAB_OFF = `${TAB} border-transparent`;
 
-// What the mode you're on is for, and what you do. Pinned to the top-left
-// corner opposite the profile button, so it reads as a label on the screen
-// rather than something standing between you and the Start button.
-// Same size as the tab bar: it's chrome sitting in a corner, not body text.
-// The width cap is what keeps it clear of the Start button on the card behind.
+// What the mode you're on is for, and what you do. Pinned to the corner opposite
+// the profile button and sized like the tab bar, because it's chrome rather than
+// body text. The width cap keeps it off the card behind it.
 const INTRO =
   "absolute top-7 left-10 m-0 max-w-[280px] text-[1.3rem] leading-[1.45]";
 
@@ -120,9 +117,10 @@ function FreeWord({
   if (typed === null) return <span>{word}</span>;
 
   const attempt = typed.toLowerCase();
+  const letters = [...word];
   // A letter you never reached is wrong too, but only once you've moved on:
   // while you're still on the word it's just a letter you haven't typed.
-  const wrong = [...word].map((char, i) =>
+  const wrong = letters.map((char, i) =>
     i < attempt.length ? attempt[i] !== char : !active,
   );
   // Anything past the end of the word renders as itself rather than being
@@ -131,7 +129,7 @@ function FreeWord({
 
   return (
     <span>
-      {[...word].map((char, i) => (
+      {letters.map((char, i) => (
         <Fragment key={i}>
           {active && i === attempt.length && <span className={FREE_CARET} />}
           <span className={wrong[i] ? FREE_MISS : ""}>{char}</span>
@@ -327,16 +325,16 @@ export default function App() {
   // list" is an outcome, not a failure, and shouldn't render in red.
   const [wordNote, setWordNote] = useState<string | null>(null);
 
-  // Free Type keeps its own phase, queue and counters. It shares nothing with a
-  // practice session on purpose: these are bare words, not graded drills, and
-  // letting the two touch is how a stray word ends up in your wpm.
+  // Free Type shares nothing with a practice session on purpose: these are bare
+  // words, not graded drills, and letting the two touch is how a stray word ends
+  // up in your wpm.
   const [freePhase, setFreePhase] = useState<FreePhase>("idle");
   // The board on screen, and where you are in it. Attempts are indexed the same
-  // way, so `freeTyped[i]` is what you wrote for `freeWords[i]`; a word is only
-  // ever inserted ahead of the cursor, which is what keeps those in step.
+  // way, so `freeAttempts[i]` is what you wrote for `freeWords[i]`; a word is
+  // only ever inserted ahead of the cursor, which is what keeps those in step.
   const [freeWords, setFreeWords] = useState<string[]>([]);
   const [freeIndex, setFreeIndex] = useState(0);
-  const [freeTyped, setFreeTyped] = useState<string[]>([]);
+  const [freeAttempts, setFreeAttempts] = useState<string[]>([]);
   const [freeCurrent, setFreeCurrent] = useState("");
   // Misses per word, this sitting only. Reset on every start: three strikes is
   // a claim about one session, not an all-time tally.
@@ -389,7 +387,7 @@ export default function App() {
       .then((words) => {
         setFreeWords(words);
         setFreeIndex(0);
-        setFreeTyped([]);
+        setFreeAttempts([]);
       })
       .catch(() => setError("Could not load more words."));
   }, [tab, freePhase, freeIndex, freeWords.length]);
@@ -415,7 +413,7 @@ export default function App() {
     setFreePhase("idle");
     setFreeWords([]);
     setFreeIndex(0);
-    setFreeTyped([]);
+    setFreeAttempts([]);
     setFreeCurrent("");
     setFreeMisses({});
     setFreeAdded([]);
@@ -589,7 +587,7 @@ export default function App() {
    * Grade the word you're on and move the cursor along.
    *
    * Right, and it's done for good. Wrong, and it's dealt back into the board
-   * further down, pushing the last word off so the board stays six rows. On the
+   * further down, pushing the last word off so the board stays ten rows. On the
    * third miss it's added to your weak list instead, because Practice takes
    * over from there and there's nothing left to learn from testing it again
    * this sitting.
@@ -601,7 +599,7 @@ export default function App() {
     setFreeCurrent("");
     setFreeTypedCount((n) => n + 1);
     setFreeIndex((i) => i + 1);
-    setFreeTyped((typed) => [...typed, attempt]);
+    setFreeAttempts((attempts) => [...attempts, attempt]);
     if (attempt === word) return;
 
     const misses = (freeMisses[word] ?? 0) + 1;
@@ -733,8 +731,8 @@ export default function App() {
   // a glance. Past 60 the extra words aren't shown — the board is the board.
   const shownWeak = weak.slice(0, WORD_SLOTS);
 
-  // Ten to a row. The index rides along because it's what everything else keys
-  // off: where the cursor is, and how each word was graded.
+  // The index rides along because it's what everything else keys off: where the
+  // cursor is, and what was typed at each slot.
   const freeRows = Array.from(
     { length: Math.ceil(freeWords.length / FREE_COLUMNS) },
     (_, row) =>
@@ -988,7 +986,7 @@ export default function App() {
                           typed={
                             index === freeIndex
                               ? freeCurrent
-                              : (freeTyped[index] ?? null)
+                              : (freeAttempts[index] ?? null)
                           }
                           active={index === freeIndex}
                         />
@@ -1167,7 +1165,9 @@ export default function App() {
                   </span>
                 </h2>
                 <p className="mt-0 mb-6 text-[1.3rem]">
-                  these are words you need to practice
+                  These are words you need to practice. Every practice session
+                  builds its sentences out of them, so don't add words you're
+                  already confident in.
                 </p>
 
                 {/* ml-auto on the panel pins it to this row's right edge, so
