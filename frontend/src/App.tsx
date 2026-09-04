@@ -44,8 +44,8 @@ const FREE_COLUMNS = 6;
 const FREE_BOARD =
   "flex w-fit flex-col gap-y-5 font-mono text-[1.6rem] leading-none";
 
-// A word you missed, and any character you got wrong inside the word you're on.
-// The same red the error line uses: nothing on the board is ever dimmed.
+// A letter you got wrong, anywhere on the board. The same red the error line
+// uses: nothing on the board is ever dimmed.
 const FREE_MISS = "text-[#ff7a70]";
 
 // Zero-width, so the caret moving through a word doesn't shove the rest of it
@@ -93,47 +93,46 @@ type Phase = "idle" | "loading" | "typing" | "submitting" | "done";
 type FreePhase = "idle" | "loading" | "typing" | "done";
 
 /**
- * One word on the Free Type board.
+ * One word on the Free Type board, drawn character by character so what you
+ * typed sits on top of what you were meant to type. `typed` is null for a word
+ * you haven't reached yet.
  *
- * The word you're on is drawn character by character so what you typed sits on
- * top of what you were meant to type: the caret marks where you are, and a
- * character that doesn't match turns red. Every other word is just itself,
- * red once you've missed it.
+ * Red is per letter and never the whole word: once you've missed something,
+ * where in the word you missed it is the only part worth looking at.
  */
 function FreeWord({
   word,
   typed,
   active,
-  missed,
 }: {
   word: string;
-  typed: string;
+  typed: string | null;
   active: boolean;
-  missed: boolean;
 }) {
-  if (!active) return <span className={missed ? FREE_MISS : ""}>{word}</span>;
+  if (typed === null) return <span>{word}</span>;
 
-  // Anything past the end of the word is wrong by definition, so it renders as
-  // itself rather than being dropped: you should see what you actually typed.
-  const overflow = typed.slice(word.length);
+  const attempt = typed.toLowerCase();
+  // A letter you never reached is wrong too, but only once you've moved on:
+  // while you're still on the word it's just a letter you haven't typed.
+  const wrong = [...word].map((char, i) =>
+    i < attempt.length ? attempt[i] !== char : !active,
+  );
+  // Anything past the end of the word renders as itself rather than being
+  // dropped: you should see what you actually typed.
+  const overflow = attempt.slice(word.length);
+
   return (
     <span>
       {[...word].map((char, i) => (
         <Fragment key={i}>
-          {i === typed.length && <span className={FREE_CARET} />}
-          <span
-            className={
-              i < typed.length && typed[i].toLowerCase() !== char
-                ? FREE_MISS
-                : ""
-            }
-          >
-            {char}
-          </span>
+          {active && i === attempt.length && <span className={FREE_CARET} />}
+          <span className={wrong[i] ? FREE_MISS : ""}>{char}</span>
         </Fragment>
       ))}
       {overflow && <span className={FREE_MISS}>{overflow}</span>}
-      {typed.length >= word.length && <span className={FREE_CARET} />}
+      {active && attempt.length >= word.length && (
+        <span className={FREE_CARET} />
+      )}
     </span>
   );
 }
@@ -324,18 +323,21 @@ export default function App() {
   // practice session on purpose: these are bare words, not graded drills, and
   // letting the two touch is how a stray word ends up in your wpm.
   const [freePhase, setFreePhase] = useState<FreePhase>("idle");
-  // The board on screen, and where you are in it. Graded outcomes are indexed
-  // the same way, so `freeGraded[i]` is how `freeWords[i]` went; a word is only
+  // The board on screen, and where you are in it. Attempts are indexed the same
+  // way, so `freeTyped[i]` is what you wrote for `freeWords[i]`; a word is only
   // ever inserted ahead of the cursor, which is what keeps those in step.
   const [freeWords, setFreeWords] = useState<string[]>([]);
   const [freeIndex, setFreeIndex] = useState(0);
-  const [freeGraded, setFreeGraded] = useState<boolean[]>([]);
+  const [freeTyped, setFreeTyped] = useState<string[]>([]);
   const [freeCurrent, setFreeCurrent] = useState("");
   // Misses per word, this sitting only. Reset on every start: three strikes is
   // a claim about one session, not an all-time tally.
   const [freeMisses, setFreeMisses] = useState<Record<string, number>>({});
   const [freeAdded, setFreeAdded] = useState<string[]>([]);
   const [freeTypedCount, setFreeTypedCount] = useState(0);
+  // Same deal as showRecap: the numbers are there if you go looking, but they
+  // aren't the first thing you see when you stop.
+  const [showFreeStats, setShowFreeStats] = useState(false);
 
   // Clock for the sentence on screen. Nothing displays it any more, but it's
   // still what wpm is computed from, so it has to stay honest: it counts only
@@ -379,7 +381,7 @@ export default function App() {
       .then((words) => {
         setFreeWords(words);
         setFreeIndex(0);
-        setFreeGraded([]);
+        setFreeTyped([]);
       })
       .catch(() => setError("Could not load more words."));
   }, [tab, freePhase, freeIndex, freeWords.length]);
@@ -405,11 +407,12 @@ export default function App() {
     setFreePhase("idle");
     setFreeWords([]);
     setFreeIndex(0);
-    setFreeGraded([]);
+    setFreeTyped([]);
     setFreeCurrent("");
     setFreeMisses({});
     setFreeAdded([]);
     setFreeTypedCount(0);
+    setShowFreeStats(false);
   }
 
   function chooseProfile(next: Profile) {
@@ -586,12 +589,12 @@ export default function App() {
   async function commitFreeWord() {
     const word = freeWords[freeIndex];
     if (!word) return;
-    const correct = normalize(freeCurrent) === word;
+    const attempt = normalize(freeCurrent);
     setFreeCurrent("");
     setFreeTypedCount((n) => n + 1);
     setFreeIndex((i) => i + 1);
-    setFreeGraded((graded) => [...graded, correct]);
-    if (correct) return;
+    setFreeTyped((typed) => [...typed, attempt]);
+    if (attempt === word) return;
 
     const misses = (freeMisses[word] ?? 0) + 1;
     setFreeMisses({ ...freeMisses, [word]: misses });
@@ -962,11 +965,12 @@ export default function App() {
                         <FreeWord
                           key={index}
                           word={word}
-                          typed={index === freeIndex ? freeCurrent : ""}
-                          active={index === freeIndex}
-                          missed={
-                            index < freeGraded.length && !freeGraded[index]
+                          typed={
+                            index === freeIndex
+                              ? freeCurrent
+                              : (freeTyped[index] ?? null)
                           }
+                          active={index === freeIndex}
                         />
                       ))}
                     </div>
@@ -999,22 +1003,37 @@ export default function App() {
             {freePhase === "done" && (
               <div className="flex flex-col gap-7 leading-[1.6]">
                 <h1 className="m-0 text-[2.4rem]">Free type finished</h1>
-                <p className="m-0 text-[1.3rem]">
-                  {freeTypedCount} typed, {freeAdded.length} added to your list.
-                </p>
-                {freeAdded.length > 0 && (
-                  <ul className="m-0 flex list-none flex-col gap-1 p-0 font-mono text-[1.3rem]">
-                    {freeAdded.map((word) => (
-                      <li key={word}>{word}</li>
-                    ))}
-                  </ul>
+                {/* self-start, or the flex row stretches and text buttons
+                    render as full-width bars. */}
+                <div className="flex gap-8 self-start">
+                  <button
+                    className={`${TEXT_BUTTON} underline underline-offset-4`}
+                    onClick={startFreeType}
+                  >
+                    Restart session
+                  </button>
+                  <button
+                    className={`${TEXT_BUTTON} underline underline-offset-4`}
+                    onClick={() => setShowFreeStats(!showFreeStats)}
+                  >
+                    {showFreeStats ? "Hide stats" : "Show stats"}
+                  </button>
+                </div>
+                {showFreeStats && (
+                  <>
+                    <p className="m-0 text-[1.3rem]">
+                      {freeTypedCount} typed, {freeAdded.length} added to your
+                      list.
+                    </p>
+                    {freeAdded.length > 0 && (
+                      <ul className="m-0 flex list-none flex-col gap-1 p-0 font-mono text-[1.3rem]">
+                        {freeAdded.map((word) => (
+                          <li key={word}>{word}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
                 )}
-                <button
-                  className={`${TEXT_BUTTON} self-start underline underline-offset-4`}
-                  onClick={startFreeType}
-                >
-                  Go again
-                </button>
               </div>
             )}
           </>
