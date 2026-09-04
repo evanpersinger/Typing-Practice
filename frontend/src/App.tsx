@@ -785,10 +785,11 @@ export default function App() {
   // the start screen's position, since it's still the start screen on display.
   const cardClass =
     tab === "words"
-      ? // Pulled into the top-left corner, out of #root's padding. Uncapped
-        // unlike every other screen, so the add-a-word panel can sit far right
-        // instead of being stranded mid-window by a reading-width cap.
-        "w-full self-start -mt-10 -ml-4"
+      ? // Uncapped, unlike every other screen, so the board and the add-a-word
+        // panel get the full window width to sit in. The top margin clears the
+        // tab bar: it's absolute, so it contributes no flow height, and #root's
+        // pt-22 alone left the heading in the same band as the tabs.
+        "w-full self-start mt-16"
       : tab === "stats"
         ? // Stats reads like a page, not a prompt, so it starts top-left.
           "m-0 w-full max-w-[880px] self-start"
@@ -1192,21 +1193,40 @@ export default function App() {
 
             {stats && (
               <section>
-                <h2 className="mt-0 mb-2 text-[1.8rem] font-semibold">
-                  Weak Words{" "}
-                  <span className="font-mono">
-                    ({weak.length}/{WORD_SLOTS})
-                  </span>
-                </h2>
-                <p className="mt-0 mb-6 text-[1.3rem]">
-                  These are words you need to practice. Every practice session
-                  builds its sentences out of them, so don't add words you're
-                  already confident in.
-                </p>
+                {/* One centred column holding the heading, the blurb and the
+                    board row. w-max takes its width from the widest child (the
+                    row), which is what lets the heading and blurb sit flush
+                    with the board's left edge while the whole block stays
+                    centred in the window. It also gives the blurb enough width
+                    to stay on one line instead of wrapping to three. */}
+                <div className="mx-auto w-max max-w-full">
+                  {/* Under the tab bar rather than tucked in the top-left
+                      corner, where it shared a band with the tabs and read as a
+                      stray label instead of the board's heading. */}
+                  <h2 className="mt-0 mb-2 text-[1.8rem] font-semibold">
+                    Weak Words{" "}
+                    <span className="font-mono">
+                      ({weak.length}/{WORD_SLOTS})
+                    </span>
+                  </h2>
+                  {/* Broken explicitly rather than left to wrap: the two
+                      sentences say different things (what the list is, and what
+                      not to put on it), and the line width here is set by the
+                      board, so natural wrapping would put the break wherever
+                      the board happened to land. */}
+                  <p className="mt-0 mb-6 text-[1.3rem]">
+                    These are words you need to practice.
+                    <br />
+                    Every practice session builds its sentences out of them, so
+                    don't add words you're already confident in.
+                    <br />
+                    {/* WORD_SLOTS rather than a literal 60, so the sentence and
+                        the board can't drift apart if the grid is ever
+                        resized. */}
+                    {WORD_SLOTS} words max.
+                  </p>
 
-                {/* ml-auto on the panel pins it to this row's right edge, so
-                    mr here is what walks it back toward the middle. */}
-                <div className="mr-24 flex items-start gap-12">
+                  <div className="flex items-start gap-16">
                   {/* border-separate keeps each cell its own rounded box
                       instead of collapsing into shared grid lines. */}
                   <table
@@ -1218,7 +1238,17 @@ export default function App() {
                           {row.map((entry, colIndex) => (
                             <td
                               key={colIndex}
-                              className="rounded-md border border-white px-2 py-3 text-center whitespace-nowrap"
+                              className={`rounded-md border px-2 py-3 text-center whitespace-nowrap ${
+                                entry
+                                  ? // The same #ff7a70 a missed word is drawn
+                                    // in during a session, so the colour means
+                                    // the same thing in both places.
+                                    "border-[#ff7a70] text-[#ff7a70]"
+                                  : // Empty slots stay dim: they're spare room,
+                                    // not something you're getting wrong, and
+                                    // sixty red boxes would say the opposite.
+                                    "border-[#4a4f4c]"
+                              }`}
                               aria-hidden={entry ? undefined : "true"}
                             >
                               {entry ? entry.word : " "}
@@ -1229,10 +1259,14 @@ export default function App() {
                     </tbody>
                   </table>
 
-                  {/* w-max: the heading is nowrap, so it sets the panel's
-                      width and the panel follows when you resize it. */}
-                  <div className="ml-auto w-max shrink-0 grow-0">
-                    <p className="mt-0 mb-2.5 text-[1.9rem] whitespace-nowrap">
+                  {/* Fixed width rather than w-max off a nowrap heading: at
+                      w-max the panel came out 409px, and 1095 + gap + 409 is
+                      wider than the window, so the centred row hung off both
+                      edges and clipped the leftmost column of words. The board
+                      can't shrink without cutting long words, so the panel is
+                      what gives. */}
+                  <div className="w-[230px] shrink-0 grow-0">
+                    <p className="mt-0 mb-2.5 text-[1.9rem]">
                       Add words you want to practice
                     </p>
 
@@ -1248,14 +1282,21 @@ export default function App() {
                         className="w-full rounded-md border border-[#4a4f4c] bg-[#1e2220] px-5 py-3 font-mono text-[1.4rem] text-white outline-none placeholder:text-[#7d827e] focus:border-white"
                         value={newWord}
                         onChange={(e) => setNewWord(e.target.value)}
-                        placeholder="add a word"
+                        placeholder="type any word"
                         autoComplete="off"
                         autoCorrect="off"
                         spellCheck={false}
                       />
+                      {/* The one green thing in the app, and the only button
+                          that writes to your word list. The colour is doing the
+                          work the position can't: it sits in a panel of plain
+                          white outlines, so green is what separates "this adds
+                          a word" from every other button on the page. Written
+                          out literally rather than pulled from a variable,
+                          because Tailwind scans the source for class strings. */}
                       <button
                         type="submit"
-                        className="cursor-pointer rounded-md border border-white px-6 py-3 text-[1.9rem] text-white no-underline hover:bg-white/8"
+                        className="cursor-pointer rounded-md border border-[#7fb069] px-6 py-3 text-[1.9rem] text-[#7fb069] no-underline hover:bg-[#7fb069]/12"
                       >
                         Add
                       </button>
@@ -1264,6 +1305,7 @@ export default function App() {
                     {wordNote && (
                       <p className="mt-0 mb-4 text-[1.3rem]">{wordNote}</p>
                     )}
+                  </div>
                   </div>
                 </div>
               </section>
