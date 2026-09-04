@@ -12,7 +12,7 @@ you're about to misspell on purpose.
 
 from __future__ import annotations
 
-from backend.agent import Analysis, Drill, GeneratedDrills, WordSuggestion
+from backend.agent import Analysis, Drill, GeneratedDrills
 
 # Short on purpose. You're exercising the app, not practicing.
 DRILLS: list[tuple[str, list[str]]] = [
@@ -40,16 +40,12 @@ def generate_drills(words: list[str] | None = None, count: int = 10) -> Generate
 
 
 def analyze_session(misses: list[dict]) -> Analysis:
-    """A canned analysis, shaped like the real one so the results screen and the
-    add-a-word path both still get exercised."""
+    """A canned analysis, shaped like the real one so the results screen still
+    gets exercised."""
     if not misses:
-        return Analysis(pattern_summary="No misses this session — clean run.", new_words=[])
+        return Analysis(pattern_summary="No misses this session, clean run.")
 
-    typos = ", ".join(f"{m['word']} → {m['typed']}" for m in misses[:5])
+    typos = ", ".join(f"{m['word']} -> {m['typed']}" for m in misses[:5])
     return Analysis(
-        pattern_summary=f"Canned analysis (testing profile). You missed: {typos}.",
-        new_words=[
-            WordSuggestion(word="rhythm", reason="canned suggestion"),
-            WordSuggestion(word="calendar", reason="canned suggestion"),
-        ],
+        pattern_summary=f"Canned analysis (testing profile). You missed: {typos}."
     )

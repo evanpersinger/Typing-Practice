@@ -284,7 +284,11 @@ function SessionRecap({
 
       {newWords.length > 0 && (
         <section>
-          <h2 className={HEADING}>added to your list</h2>
+          {/* Words you put on the list yourself, by misspelling them three
+              times. Nothing here was nominated: the model stopped suggesting
+              words because a word you've never typed outranks, next session,
+              every word you actually keep getting wrong. */}
+          <h2 className={HEADING}>added from your misses</h2>
           {newWords.map((w) => (
             <p key={w.word} className="my-1.5">
               <b className="font-mono">{w.word}</b> {w.reason}

@@ -34,8 +34,8 @@ gpt-5-nano        smallest and cheapest
 """
 
 MODELS = {
-    "anthropic": "claude-haiku-4-5-20251001",
-    "openai": "gpt-5-nano",
+    "anthropic": "claude-haiku-4-5-20251001", # haiku 4.5
+    "openai": "gpt-5-nano", # gpt 5-nano
 }
 
 # The env var each provider's SDK reads its key from. Checked up front so a
@@ -118,14 +118,8 @@ class GeneratedDrills(BaseModel):
     drills: list[Drill]
 
 
-class WordSuggestion(BaseModel):
-    word: str
-    reason: str
-
-
 class Analysis(BaseModel):
     pattern_summary: str
-    new_words: list[WordSuggestion]
 
 
 # session start: generate practice sentences
@@ -146,9 +140,15 @@ def generate_drills(words: list[str], count: int = 10) -> GeneratedDrills:
 
 # session end: find the pattern behind the misses
 def analyze_session(misses: list[dict]) -> Analysis:
-    """`misses` is a list of {"word": target, "typed": what_the_user_typed}."""
+    """`misses` is a list of {"word": target, "typed": what_the_user_typed}.
+
+    The model reads the misses and nothing else. It used to also nominate words
+    to practice next, which is a guess about words you have never typed, and
+    get_drilling_words ranks an unattempted word above every word you actually
+    keep getting wrong. Words earn their place by being misspelled now.
+    """
     if not misses:
-        return Analysis(pattern_summary="No misses this session — clean run.", new_words=[])
+        return Analysis(pattern_summary="No misses this session, clean run.")
 
     lines = "\n".join(f"- target '{m['word']}' typed as '{m['typed']}'" for m in misses)
     prompt = (
@@ -156,8 +156,6 @@ def analyze_session(misses: list[dict]) -> Analysis:
         "words they got wrong this session, with what they actually typed:\n"
         f"{lines}\n\n"
         "In one or two plain sentences, describe the pattern behind these mistakes "
-        "(e.g. letter transposition, dropped double letters, ie/ei swaps). Then "
-        "suggest up to 5 NEW words (not already in the list above) that fit the same "
-        "weakness and would be good practice, each with a short reason."
+        "(e.g. letter transposition, dropped double letters, ie/ei swaps)."
     )
     return _parse(prompt, 1500, Analysis)

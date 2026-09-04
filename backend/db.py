@@ -112,6 +112,13 @@ def init_db() -> None:
                 timestamp  TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
+            CREATE TABLE IF NOT EXISTS misspellings (
+                word      TEXT PRIMARY KEY,
+                typed     TEXT NOT NULL,
+                misses    INTEGER NOT NULL DEFAULT 1,
+                last_seen TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
             CREATE TABLE IF NOT EXISTS drills (
                 id          INTEGER PRIMARY KEY,
                 sentence    TEXT NOT NULL,
@@ -164,6 +171,36 @@ def add_word(word: str, source: str = "seed") -> bool:
             (word, source),
         )
         return cursor.rowcount > 0
+
+
+def record_misspelling(word: str, typed: str) -> int:
+    """Count one misspelling of an untracked word. Returns the running total.
+
+    Separate from `attempts`, which is the record of words already on your list.
+    A word only lives here while it's on its way onto that list, and the count
+    has to survive a session: ten sentences is nowhere near enough to get the
+    same word wrong three times.
+    """
+    word = word.strip().lower()
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            INSERT INTO misspellings (word, typed) VALUES (?, ?)
+            ON CONFLICT(word) DO UPDATE
+                SET misses = misses + 1,
+                    typed = excluded.typed,
+                    last_seen = datetime('now')
+            RETURNING misses
+            """,
+            (word, typed),
+        ).fetchone()
+    return row["misses"]
+
+
+def clear_misspelling(word: str) -> None:
+    """Forget the running count, once the word has earned its place on the list."""
+    with _connect() as conn:
+        conn.execute("DELETE FROM misspellings WHERE word = ?", (word.strip().lower(),))
 
 
 def seed_from_file(path: Path) -> int:

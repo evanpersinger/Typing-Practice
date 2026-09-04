@@ -87,6 +87,70 @@ FREE_TYPE_POOL = [
 ]
 
 
+# What it takes for a word you typed wrong to start counting against you. The
+# length floor is what keeps short words out: one edit turns "two" into "too"
+# and "the" into "she", which are different words, not misspellings. Above that
+# floor, being within two edits of the word on screen means you were reaching
+# for that word and mistyped it.
+MISSPELL_STRIKES = 3
+MIN_MISSPELL_LENGTH = 5
+MAX_MISSPELL_EDITS = 2
+
+
+def _within_edits(typed: str, expected: str, cap: int) -> bool:
+    """Levenshtein distance between the two words, but only asked <= cap.
+
+    Bailing out at `cap` is what keeps this honest on a word substitution: two
+    unrelated words stop being compared after three rows instead of being scored
+    in full.
+    """
+    if abs(len(typed) - len(expected)) > cap:
+        return False
+
+    previous = list(range(len(expected) + 1))
+    for i, typed_char in enumerate(typed, start=1):
+        current = [i]
+        for j, expected_char in enumerate(expected, start=1):
+            current.append(
+                min(
+                    previous[j] + 1,  # deletion
+                    current[j - 1] + 1,  # insertion
+                    previous[j - 1] + (typed_char != expected_char),  # substitution
+                )
+            )
+        if min(current) > cap:
+            return False
+        previous = current
+    return previous[-1] <= cap
+
+
+def find_misspellings(sentence: str, typed: str) -> list[tuple[str, str]]:
+    """Words in `sentence` you spelled wrong, as (word, what_you_typed) pairs.
+
+    Positional alignment, same as the frontend's grader and with the same
+    limitation: inserting or dropping a word shifts everything after it. A
+    shifted pair reads as two unrelated words, which is exactly what the edit
+    distance throws out, so the failure mode is missing a real misspelling
+    rather than inventing one.
+    """
+    def bare(raw: str) -> str:
+        return raw.strip(".,!?;:'\"").lower()
+
+    expected_words = [bare(raw) for raw in sentence.split()]
+    typed_words = [bare(raw) for raw in typed.split()]
+
+    found: list[tuple[str, str]] = []
+    for i, word in enumerate(expected_words):
+        if len(word) < MIN_MISSPELL_LENGTH or not WORD_PATTERN.match(word):
+            continue
+        attempt = typed_words[i] if i < len(typed_words) else ""
+        if not attempt or attempt == word:
+            continue
+        if _within_edits(attempt, word, MAX_MISSPELL_EDITS):
+            found.append((word, attempt))
+    return found
+
+
 class WordResult(BaseModel):
     word: str
     typed: str
@@ -184,6 +248,9 @@ def submit_results(payload: ResultsPayload, profile: Profile):
     session_id = db.start_session()
 
     misses: list[dict] = []
+    tracked = {row["word"] for row in db.get_all_words()}
+    earned: list[dict] = []
+
     for drill in payload.results:
         db.record_drill(drill.sentence, drill.typed, drill.duration_ms, session_id)
         for word in drill.words:
@@ -191,24 +258,41 @@ def submit_results(payload: ResultsPayload, profile: Profile):
             if not word.correct:
                 misses.append({"word": word.word, "typed": word.typed})
 
+        # Every other word in the sentence. The graded ones above are already on
+        # your list; these are the ones nothing was watching, and three misses
+        # is what puts one on it.
+        for word, attempt in find_misspellings(drill.sentence, drill.typed):
+            if word in tracked:
+                continue
+            if db.record_misspelling(word, attempt) < MISSPELL_STRIKES:
+                continue
+            db.add_word(word, source="performance")
+            db.clear_misspelling(word)
+            tracked.add(word)
+            earned.append(
+                {
+                    "word": word,
+                    "reason": f"you've spelled it wrong {MISSPELL_STRIKES} times, "
+                    f"most recently as '{attempt}'",
+                }
+            )
+
     analysis = agent_for(profile).analyze_session(misses)
 
-    for suggestion in analysis.new_words:
-        db.add_word(suggestion.word, source="agent")
-
-    db.finish_session(
-        session_id,
-        analysis.pattern_summary,
-        [s.model_dump() for s in analysis.new_words],
-    )
+    # Suggestions are recorded, not added. get_drilling_words ranks unattempted
+    # words above everything else, so a word added here would outrank the words
+    # you actually keep missing until you'd practiced it once. Five a session was
+    # enough to fill most of the next session with the model's guesses. They go
+    # on your list when you say so, from the recap.
+    db.finish_session(session_id, analysis.pattern_summary, earned)
     db.write_session_transcript(
         [d.model_dump() for d in payload.results],
         analysis.pattern_summary,
-        [s.model_dump() for s in analysis.new_words],
+        earned,
     )
     return {
         "pattern_summary": analysis.pattern_summary,
-        "new_words": [s.model_dump() for s in analysis.new_words],
+        "new_words": earned,
         "typing": db.get_typing_stats(session_id),
     }
 
