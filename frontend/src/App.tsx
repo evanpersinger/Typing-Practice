@@ -41,7 +41,8 @@ const REQUEUE_AFTER = 5;
 // ragged and the words sit exactly one space apart (1ch, in a mono face).
 const FREE_COLUMNS = 6;
 const FREE_BOARD =
-  "flex w-fit flex-col gap-y-5 font-mono text-[1.6rem] leading-none";
+  "flex w-fit flex-col gap-y-5 rounded-xl border-[6px] border-[#4a4f4c] " +
+  "px-10 py-8 font-mono text-[1.6rem] leading-none";
 
 // A letter you got wrong, anywhere on the board. The same red the error line
 // uses: nothing on the board is ever dimmed.
@@ -898,10 +899,12 @@ export default function App() {
                 <p className="mb-4 font-mono text-[1.9rem] leading-[1.6]">
                   {drills[index].sentence}
                 </p>
+                {/* Off screen, not gone: it still catches every keystroke,
+                    there just isn't a box on the page any more. */}
                 <input
                   key={index}
                   ref={inputRef}
-                  className="w-full rounded-lg border border-[#4a4f4c] bg-[#1e2220] px-4.5 py-4 font-mono text-[1.9rem] text-white outline-none placeholder:text-[#7d827e] focus:border-white"
+                  className="sr-only"
                   value={current}
                   onChange={handleChange}
                   onKeyDown={handleKeyDown}

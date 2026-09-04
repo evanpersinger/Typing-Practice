@@ -7,8 +7,13 @@
   </head>
   <body>
     <!-- The top padding is the only thing keeping a tall page from running
-         under the tab bar, which is absolutely positioned above it. -->
-    <div id="root" class="relative flex min-h-screen px-10 pt-22 pb-12"></div>
+         under the tab bar, which is absolutely positioned above it. The frame
+         runs flush to the window edge; box-border means its width comes out of
+         the 100vh rather than adding to it, so the page still doesn't scroll. -->
+    <div
+      id="root"
+      class="relative flex min-h-screen border-[16px] border-[#4a4f4c] px-10 pt-22 pb-12"
+    ></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
