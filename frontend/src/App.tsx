@@ -799,11 +799,15 @@ export default function App() {
               "m-auto"
             : freePhase === "done"
               ? "m-auto w-full max-w-[880px]"
-              : "mx-auto my-0 w-full max-w-[880px] self-start"
+              : "mx-auto mt-48 mb-0 w-full max-w-[880px] self-start"
           : phase === "idle" || phase === "loading"
           ? // The start screen is two short lines; centering them leaves the
-            // button floating in an empty page, so it pins to the top.
-            "mx-auto my-0 w-full max-w-[880px] self-start"
+            // button floating in an empty page, so it pins near the top rather
+            // than the middle. The top margin is what keeps it there without
+            // running under the chrome: the tab bar and the intro blurb are both
+            // absolute at top-7, so they take up no flow height, and #root's
+            // pt-22 alone left the button sitting on top of the Practice tab.
+            "mx-auto mt-48 mb-0 w-full max-w-[880px] self-start"
           : // Centered, so the sentence you're typing lands under your eyes.
             // Auto margins rather than align-items, which clips the top of
             // anything taller than the viewport.
@@ -997,7 +1001,7 @@ export default function App() {
                   className="cursor-pointer rounded-[10px] border border-white px-20 py-9 text-[3.2rem] text-white no-underline hover:bg-white/8"
                   onClick={startFreeType}
                 >
-                  Start
+                  Start session
                 </button>
                 {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}
               </>
