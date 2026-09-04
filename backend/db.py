@@ -213,6 +213,16 @@ def seed_from_file(path: Path) -> int:
     return len(words)
 
 
+def count_drilling_words() -> int:
+    """How many words are still in rotation. Mastered ones don't count, so the
+    list makes room for itself as you improve."""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM words WHERE status = 'drilling'"
+        ).fetchone()
+    return row["n"]
+
+
 def get_drilling_words(limit: int = 10) -> list[str]:
     """Words still in rotation, worst first: never-practiced, then high miss-rate."""
     with _connect() as conn:

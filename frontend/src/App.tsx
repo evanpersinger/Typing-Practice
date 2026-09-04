@@ -786,9 +786,8 @@ export default function App() {
   const cardClass =
     tab === "words"
       ? // Uncapped, unlike every other screen, so the board and the add-a-word
-        // panel get the full window width to sit in. The top margin clears the
-        // tab bar: it's absolute, so it contributes no flow height, and #root's
-        // pt-22 alone left the heading in the same band as the tabs.
+        // panel get the full window width. The top margin clears the tab bar,
+        // which is absolute and so contributes no flow height of its own.
         "w-full self-start mt-16"
       : tab === "stats"
         ? // Stats reads like a page, not a prompt, so it starts top-left.
@@ -803,11 +802,9 @@ export default function App() {
               : "mx-auto mt-48 mb-0 w-full max-w-[880px] self-start"
           : phase === "idle" || phase === "loading"
           ? // The start screen is two short lines; centering them leaves the
-            // button floating in an empty page, so it pins near the top rather
-            // than the middle. The top margin is what keeps it there without
-            // running under the chrome: the tab bar and the intro blurb are both
-            // absolute at top-7, so they take up no flow height, and #root's
-            // pt-22 alone left the button sitting on top of the Practice tab.
+            // button floating in an empty page, so it sits high instead. The top
+            // margin clears the tab bar and intro blurb, both absolute at top-7
+            // and so contributing no flow height to push it down.
             "mx-auto mt-48 mb-0 w-full max-w-[880px] self-start"
           : // Centered, so the sentence you're typing lands under your eyes.
             // Auto margins rather than align-items, which clips the top of
@@ -1193,36 +1190,26 @@ export default function App() {
 
             {stats && (
               <section>
-                {/* One centred column holding the heading, the blurb and the
-                    board row. w-max takes its width from the widest child (the
-                    row), which is what lets the heading and blurb sit flush
-                    with the board's left edge while the whole block stays
-                    centred in the window. It also gives the blurb enough width
-                    to stay on one line instead of wrapping to three. */}
+                {/* w-max takes its width from the widest child (the board row),
+                    so the heading and blurb sit flush with the board's left edge
+                    while the whole block stays centred in the window. */}
                 <div className="mx-auto w-max max-w-full">
-                  {/* Under the tab bar rather than tucked in the top-left
-                      corner, where it shared a band with the tabs and read as a
-                      stray label instead of the board's heading. */}
                   <h2 className="mt-0 mb-2 text-[1.8rem] font-semibold">
                     Weak Words{" "}
                     <span className="font-mono">
                       ({weak.length}/{WORD_SLOTS})
                     </span>
                   </h2>
-                  {/* Broken explicitly rather than left to wrap: the two
-                      sentences say different things (what the list is, and what
-                      not to put on it), and the line width here is set by the
-                      board, so natural wrapping would put the break wherever
-                      the board happened to land. */}
+                  {/* Broken explicitly: the line width here comes from the
+                      board, so wrapping would put the breaks wherever it lands.
+                      WORD_SLOTS rather than a literal 60, so the sentence can't
+                      drift from the grid it describes. */}
                   <p className="mt-0 mb-6 text-[1.3rem]">
                     These are words you need to practice.
                     <br />
                     Every practice session builds its sentences out of them, so
                     don't add words you're already confident in.
                     <br />
-                    {/* WORD_SLOTS rather than a literal 60, so the sentence and
-                        the board can't drift apart if the grid is ever
-                        resized. */}
                     {WORD_SLOTS} words max.
                   </p>
 
@@ -1240,14 +1227,11 @@ export default function App() {
                               key={colIndex}
                               className={`rounded-md border px-2 py-3 text-center whitespace-nowrap ${
                                 entry
-                                  ? // The same #ff7a70 a missed word is drawn
-                                    // in during a session, so the colour means
-                                    // the same thing in both places.
+                                  ? // The same red a missed word gets mid-session.
+                                    // Empty slots stay dim: spare room isn't
+                                    // something you're getting wrong.
                                     "border-[#ff7a70] text-[#ff7a70]"
-                                  : // Empty slots stay dim: they're spare room,
-                                    // not something you're getting wrong, and
-                                    // sixty red boxes would say the opposite.
-                                    "border-[#4a4f4c]"
+                                  : "border-[#4a4f4c]"
                               }`}
                               aria-hidden={entry ? undefined : "true"}
                             >
@@ -1259,12 +1243,9 @@ export default function App() {
                     </tbody>
                   </table>
 
-                  {/* Fixed width rather than w-max off a nowrap heading: at
-                      w-max the panel came out 409px, and 1095 + gap + 409 is
-                      wider than the window, so the centred row hung off both
-                      edges and clipped the leftmost column of words. The board
-                      can't shrink without cutting long words, so the panel is
-                      what gives. */}
+                  {/* Fixed rather than w-max: at w-max the panel came out 409px
+                      and the row overflowed the window, clipping words off the
+                      board. The board can't shrink, so the panel gives. */}
                   <div className="w-[230px] shrink-0 grow-0">
                     <p className="mt-0 mb-2.5 text-[1.9rem]">
                       Add words you want to practice
@@ -1287,13 +1268,9 @@ export default function App() {
                         autoCorrect="off"
                         spellCheck={false}
                       />
-                      {/* The one green thing in the app, and the only button
-                          that writes to your word list. The colour is doing the
-                          work the position can't: it sits in a panel of plain
-                          white outlines, so green is what separates "this adds
-                          a word" from every other button on the page. Written
-                          out literally rather than pulled from a variable,
-                          because Tailwind scans the source for class strings. */}
+                      {/* The one green thing in the app: it's the only button
+                          that writes to your word list, and everything around it
+                          is a plain white outline. */}
                       <button
                         type="submit"
                         className="cursor-pointer rounded-md border border-[#7fb069] px-6 py-3 text-[1.9rem] text-[#7fb069] no-underline hover:bg-[#7fb069]/12"

@@ -67,6 +67,11 @@ Profile = Annotated[str, Depends(use_profile)]
 WORD_PATTERN = re.compile(r"^[a-z][a-z'-]*$")
 MAX_WORD_LENGTH = 40
 
+# Matches the frontend's board (six by ten), so the cap and the thing that
+# displays it can't disagree. Seeding bypasses this endpoint, so a seed list
+# longer than 60 still loads.
+MAX_WEAK_WORDS = 60
+
 
 # Free Type draws from the most common English words by measured usage, not from
 # a dictionary and not from a list anybody hand-picked. Both length bounds are
@@ -227,6 +232,16 @@ def add_practice_word(payload: WordPayload, profile: Profile):
         raise HTTPException(
             status_code=400,
             detail="One word only — letters, apostrophes and hyphens.",
+        )
+    # Free Type adds through here too, so a word earning its third miss hits the
+    # same ceiling rather than sneaking past it.
+    if db.count_drilling_words() >= MAX_WEAK_WORDS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Your list is full at {MAX_WEAK_WORDS} words. "
+                "Master a few before adding more."
+            ),
         )
 
     # `added` is False when the word was already tracked. Not an error: you
