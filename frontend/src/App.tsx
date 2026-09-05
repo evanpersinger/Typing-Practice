@@ -369,11 +369,14 @@ export default function App() {
   // Misses per word, this sitting only. Reset on every start: three strikes is
   // a claim about one session, not an all-time tally.
   const [freeMisses, setFreeMisses] = useState<Record<string, number>>({});
-  const [freeAdded, setFreeAdded] = useState<string[]>([]);
   const [freeTypedCount, setFreeTypedCount] = useState(0);
-  // Same deal as showRecap: the numbers are there if you go looking, but they
-  // aren't the first thing you see when you stop.
-  const [showFreeStats, setShowFreeStats] = useState(false);
+  // Free Type's own clock, kept apart from the sentence clock above: openFreeType
+  // deliberately stops that one so warming up never counts as practice time.
+  // Characters rather than words, because wpm here has to mean the same thing it
+  // means on the stats tab (five characters to a word).
+  const freeStartedAt = useRef<number | null>(null);
+  const [freeElapsedMs, setFreeElapsedMs] = useState(0);
+  const [freeChars, setFreeChars] = useState(0);
 
   // Clock for the sentence on screen. Nothing displays it any more, but it's
   // still what wpm is computed from, so it has to stay honest: it counts only
@@ -446,9 +449,10 @@ export default function App() {
     setFreeAttempts([]);
     setFreeCurrent("");
     setFreeMisses({});
-    setFreeAdded([]);
     setFreeTypedCount(0);
-    setShowFreeStats(false);
+    freeStartedAt.current = null;
+    setFreeElapsedMs(0);
+    setFreeChars(0);
   }
 
   function chooseProfile(next: Profile) {
@@ -628,6 +632,12 @@ export default function App() {
     const attempt = normalize(freeCurrent);
     setFreeCurrent("");
     setFreeTypedCount((n) => n + 1);
+    setFreeChars((n) => n + attempt.length);
+    // Read once per word rather than on a timer: the numbers move when you
+    // finish a word, which is the only moment they can change anyway.
+    if (freeStartedAt.current !== null) {
+      setFreeElapsedMs(Date.now() - freeStartedAt.current);
+    }
     setFreeIndex((i) => i + 1);
     setFreeAttempts((attempts) => [...attempts, attempt]);
     if (attempt === word) return;
@@ -651,7 +661,6 @@ export default function App() {
 
     try {
       await addWord(word);
-      setFreeAdded((added) => [...added, word]);
     } catch (e) {
       setError(e instanceof Error ? e.message : `Could not add ${word}.`);
     }
@@ -740,6 +749,16 @@ export default function App() {
   const drilled = stats?.words.filter((w) => w.attempts > 0) ?? [];
   const totalAttempts = drilled.reduce((sum, w) => sum + w.attempts, 0);
   const totalMisses = drilled.reduce((sum, w) => sum + w.misses, 0);
+
+  // Free Type's live numbers. Nothing is stored: this is a warm-up, and a board
+  // that filters out every word already on your weak list would flatter the
+  // stats tab if it fed into it. Same five-characters-to-a-word rule the backend
+  // uses, so the number is comparable to the one on the stats tab.
+  const freeMissCount = Object.values(freeMisses).reduce((sum, n) => sum + n, 0);
+  const freeWpm =
+    freeElapsedMs > 0
+      ? Math.round((freeChars * 60000) / (5 * freeElapsedMs))
+      : 0;
 
   // Every word with at least one miss, worst first. No cap: this table is
   // the one place the app tells you what to work on, not a highlight reel.
@@ -1017,6 +1036,20 @@ export default function App() {
               // Clicking anywhere on the board puts the cursor back, since the
               // input catching your keystrokes is off screen.
               <div onClick={() => freeInputRef.current?.focus()}>
+                {/* Above the board rather than below it: the board grows and
+                    shrinks with the word count, so anything under it moves. */}
+                <div className="mb-6 flex gap-12">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[2rem] font-semibold">{freeWpm}</span>
+                    <span className="text-[1.1rem]">wpm</span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[2rem] font-semibold">
+                      {pct(freeTypedCount - freeMissCount, freeTypedCount)}
+                    </span>
+                    <span className="text-[1.1rem]">accuracy</span>
+                  </div>
+                </div>
                 <div className={FREE_BOARD}>
                   {freeRows.map((row, rowIndex) => (
                     <div key={rowIndex} className="flex gap-x-[1ch]">
@@ -1041,7 +1074,14 @@ export default function App() {
                   ref={freeInputRef}
                   className="sr-only"
                   value={freeCurrent}
-                  onChange={(e) => setFreeCurrent(e.target.value)}
+                  onChange={(e) => {
+                    // First keystroke starts the clock, not the board appearing,
+                    // so staring at it for ten seconds doesn't cost you wpm.
+                    if (freeStartedAt.current === null) {
+                      freeStartedAt.current = Date.now();
+                    }
+                    setFreeCurrent(e.target.value);
+                  }}
                   onKeyDown={handleFreeKeyDown}
                   autoComplete="off"
                   autoCorrect="off"
@@ -1051,41 +1091,15 @@ export default function App() {
               </div>
             )}
 
+            {/* No recap: nothing here was measured to be kept. The live numbers
+                were the point, and they were on screen the whole time. */}
             {freePhase === "done" && (
-              <div className="flex flex-col gap-7 leading-[1.6]">
-                <h1 className="m-0 text-[2.4rem]">Free type finished</h1>
-                {/* self-start, or the flex row stretches and text buttons
-                    render as full-width bars. */}
-                <div className="flex gap-8 self-start">
-                  <button
-                    className={`${TEXT_BUTTON} underline underline-offset-4`}
-                    onClick={startFreeType}
-                  >
-                    Restart session
-                  </button>
-                  <button
-                    className={`${TEXT_BUTTON} underline underline-offset-4`}
-                    onClick={() => setShowFreeStats(!showFreeStats)}
-                  >
-                    {showFreeStats ? "Hide stats" : "Show stats"}
-                  </button>
-                </div>
-                {showFreeStats && (
-                  <>
-                    <p className="m-0 text-[1.3rem]">
-                      {freeTypedCount} typed, {freeAdded.length} added to your
-                      list.
-                    </p>
-                    {freeAdded.length > 0 && (
-                      <ul className="m-0 flex list-none flex-col gap-1 p-0 font-mono text-[1.3rem]">
-                        {freeAdded.map((word) => (
-                          <li key={word}>{word}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </>
-                )}
-              </div>
+              <button
+                className={`${TEXT_BUTTON} self-start underline underline-offset-4`}
+                onClick={startFreeType}
+              >
+                Restart session
+              </button>
             )}
           </>
         )}
