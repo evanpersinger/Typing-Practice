@@ -430,14 +430,38 @@ export default function App() {
 
   useEffect(() => {
     if (tab !== "free" || freePhase !== "typing") return;
-    freeInputRef.current?.focus();
-    // The board runs past the bottom of the window, so the row you're on is
-    // scrolled up to meet you. "nearest" rather than "center", or every word
-    // would yank the page even while the caret is comfortably in view.
-    document
-      .querySelector("[data-free-caret]")
-      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    // preventScroll matters: the input is sr-only and sits after the board in
+    // the DOM, so a plain focus() makes the browser scroll it into view, which
+    // would jump the page to the bottom of the board on every word.
+    freeInputRef.current?.focus({ preventScroll: true });
   }, [tab, freePhase, freeIndex]);
+
+  // Keyed on the row, not the word: within a row nothing needs to move, so
+  // this doesn't even run for five words out of six.
+  const activeRow = Math.floor(freeIndex / FREE_COLUMNS);
+
+  useEffect(() => {
+    if (tab !== "free" || freePhase !== "typing") return;
+    // A fresh board starts at the top of the page rather than wherever the last
+    // one left the scroll, which is halfway down by the time you finish it.
+    if (freeIndex === 0) {
+      window.scrollTo({ top: 0 });
+      return;
+    }
+    const active = document.querySelector("[data-free-caret]");
+    if (!active) return;
+    // Shift by exactly enough to clear the edge, never scrollIntoView: that
+    // centres the row, which throws the page a third of a screen in one go and
+    // loses your place. Here the board steps by about a row and stops.
+    const { top, bottom } = active.getBoundingClientRect();
+    const margin = 140;
+    if (bottom > window.innerHeight - margin) {
+      window.scrollBy({ top: bottom - (window.innerHeight - margin) });
+    } else if (top < margin) {
+      window.scrollBy({ top: top - margin });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, freePhase, activeRow]);
 
   // Type through the board and the next one takes its place, rather than the
   // session ending out from under you.
@@ -845,9 +869,11 @@ export default function App() {
           "mx-0 mt-16 mb-0 w-full max-w-[880px] self-start"
         : tab === "free"
           ? freePhase === "typing"
-            ? // The board sizes itself to its widest row, so the card takes its
-              // width from the board rather than the usual reading cap.
-              "m-auto"
+            ? // No width cap: the card takes its width from the board. Pinned to
+              // the top rather than centred, because the board is taller than
+              // the window now and centring it hangs the stats off the top,
+              // under the tab bar.
+              "mx-auto mt-16 mb-0 self-start"
             : "mx-auto mt-48 mb-0 w-full max-w-[880px] self-start"
           : phase === "idle" || phase === "loading"
           ? // The start screen is two short lines; centering them leaves the
@@ -1064,19 +1090,26 @@ export default function App() {
             {freePhase === "typing" && (
               // Clicking anywhere on the board puts the cursor back, since the
               // input catching your keystrokes is off screen.
-              <div onClick={() => freeInputRef.current?.focus()}>
+              <div
+                onClick={() => freeInputRef.current?.focus({ preventScroll: true })}
+              >
                 {/* Above the board rather than below it: the board grows and
                     shrinks with the word count, so anything under it moves. */}
-                {/* Fixed-width columns: these numbers change while you type,
-                    and without a floor "0" becoming "125" shunts everything
-                    next to it sideways mid-word. */}
+                {/* These numbers change on every word, so they get a fixed
+                    width and no wrapping: left to size themselves, a longer
+                    value wraps, the column grows taller, and the whole board
+                    below it jumps. The width sits on the number itself, not the
+                    column, because ch resolves against the element's own
+                    font-size and only the number is set at 2rem. */}
                 <div className="mb-6 flex gap-12">
-                  <div className="flex w-[5ch] flex-col gap-1">
-                    <span className="text-[2rem] font-semibold">{freeWpm}</span>
+                  <div className="flex flex-col gap-1">
+                    <span className="w-[5ch] text-[2rem] font-semibold tabular-nums whitespace-nowrap">
+                      {freeWpm}
+                    </span>
                     <span className="text-[1.1rem]">wpm</span>
                   </div>
-                  <div className="flex w-[6ch] flex-col gap-1">
-                    <span className="text-[2rem] font-semibold">
+                  <div className="flex flex-col gap-1">
+                    <span className="w-[5ch] text-[2rem] font-semibold tabular-nums whitespace-nowrap">
                       {pct(freeTypedCount - freeMissCount, freeTypedCount)}
                     </span>
                     <span className="text-[1.1rem]">accuracy</span>
@@ -1100,11 +1133,17 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                {/* Off screen on purpose: what you type is drawn into the board
-                    itself, so a second copy of it in a box is just noise. */}
+                {/* Invisible on purpose: what you type is drawn into the board
+                    itself, so a second copy of it in a box is just noise.
+                    Fixed to the corner of the viewport rather than sr-only,
+                    which is absolutely positioned and would sit after the board
+                    in the flow. The browser scrolls a focused field's own caret
+                    into view as you type, so from down there the first keystroke
+                    threw the page to the bottom of the board. Pinned in the
+                    viewport there's nothing left to scroll to. */}
                 <input
                   ref={freeInputRef}
-                  className="sr-only"
+                  className="fixed top-0 left-0 size-px opacity-0"
                   value={freeCurrent}
                   onChange={(e) => {
                     // First keystroke starts the clock, not the board appearing,
