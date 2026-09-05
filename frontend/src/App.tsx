@@ -45,6 +45,12 @@ const REQUEUE_AFTER = 5;
 // one. No border, the fill is the edge.
 const WORD_SURFACE = "rounded-xl bg-[#4a4f4c]";
 
+// The practice sentence's box. Same surface as the Free Type board, deliberately:
+// one app, one ground under the words. The padding is its own, because the
+// sentence is set well above a board word's size and the board's px-10 reads as
+// a tight margin around type that big.
+const PROMPT_BOARD = `${WORD_SURFACE} px-14 py-12`;
+
 const FREE_COLUMNS = 6;
 // min-w, not w-fit alone: the width would otherwise track whichever row is
 // currently widest, so swapping in a new board would resize the panel. 52ch is
@@ -70,11 +76,14 @@ const FREE_PENDING = "text-[#7d827e]";
 const FREE_CARET =
   "inline-block h-[1.05em] w-0 -mx-px border-l-2 border-white align-[-0.15em]";
 
-// Text buttons, not filled boxes: the size, colour and cursor used to come from
-// a global `button {}` rule, which is gone now, so they're stated here.
+// The two things you can do on a finished session. Boxes rather than the
+// underlined text they used to be: they're the only actions on the screen, so
+// they should look like things you press. Same white outline and hover fill as
+// every other box button here, just sized to sit under the heading.
 // Tailwind's reset gives buttons `cursor: default`, hence the explicit pointer.
-const TEXT_BUTTON =
-  "cursor-pointer text-[1.3rem] text-white hover:opacity-[0.55]";
+const DONE_BUTTON =
+  "cursor-pointer rounded-lg border border-white px-10 py-5 " +
+  "text-[2rem] text-white no-underline hover:bg-white/8";
 
 // The four nav buttons. Boxes rather than underlined text, so the active one is
 // a faint fill instead of a border: the border is on all four now. Only the
@@ -187,6 +196,40 @@ function FreeWord({
         <span className={FREE_CARET} />
       )}
     </span>
+  );
+}
+
+// The sentence you're copying, drawn character by character against what you've
+// typed so far. Same three states and the same caret as the Free Type board, so a
+// grey letter means the same thing in both modes: one you haven't reached yet.
+function PromptText({ sentence, typed }: { sentence: string; typed: string }) {
+  const letters = [...sentence];
+  // What you typed past the end of the sentence, rendered rather than dropped:
+  // you should see what you actually typed. Inline rather than out of flow like
+  // the board's, since there's nothing after the sentence for it to shove along.
+  const overflow = typed.slice(letters.length);
+  // Case-insensitive, the same as normalize() and the board: a capital you typed
+  // lowercase still grades correct, so it can't render red.
+  const letterClass = (char: string, i: number) =>
+    i >= typed.length
+      ? FREE_PENDING
+      : typed[i].toLowerCase() === char.toLowerCase()
+        ? ""
+        : FREE_MISS;
+
+  return (
+    <>
+      {letters.map((char, i) => (
+        <Fragment key={i}>
+          {i === typed.length && <span className={FREE_CARET} />}
+          <span className={letterClass(char, i)}>{char}</span>
+        </Fragment>
+      ))}
+      {/* After the overflow, not before it: the caret sits at the end of what
+          you've typed, and past the last letter that's past the overflow too. */}
+      {overflow && <span className={FREE_MISS}>{overflow}</span>}
+      {typed.length >= letters.length && <span className={FREE_CARET} />}
+    </>
   );
 }
 
@@ -881,10 +924,16 @@ export default function App() {
             // margin clears the tab bar and intro blurb, both absolute at top-7
             // and so contributing no flow height to push it down.
             "mx-auto mt-48 mb-0 w-full max-w-[880px] self-start"
-          : // Centered, so the sentence you're typing lands under your eyes.
-            // Auto margins rather than align-items, which clips the top of
-            // anything taller than the viewport.
-            "m-auto w-full max-w-[880px]";
+          : phase === "typing"
+            ? // Centered, so the sentence you're typing lands under your eyes.
+              // Auto margins rather than align-items, which clips the top of
+              // anything taller than the viewport. Wider than every other screen
+              // because of the size the sentence is set at: at the usual 880px an
+              // ordinary sentence broke over four lines.
+              "m-auto w-full max-w-[1200px]"
+            : // The recap is a table and a couple of headings, so it keeps the
+              // width the rest of the app reads at.
+              "m-auto w-full max-w-[880px]";
 
   // Each mode says its own piece, and only while you're not typing: mid-sentence
   // it's one more thing on screen competing with the words. Off the typing
@@ -1008,26 +1057,38 @@ export default function App() {
 
             {phase === "typing" && drills[index] && (
               <>
-                {/* Prompt and input are deliberately the same size and face.
-                    You read one while typing the other, so any mismatch makes
-                    them harder to compare. */}
-                <p className="mb-4 font-mono text-[1.9rem] leading-[1.6]">
-                  {drills[index].sentence}
-                </p>
-                {/* No box around it, just the line you're writing under the
-                    one you're copying. Same face and size as the sentence, so
-                    the two read as one block instead of a form. */}
-                <input
-                  key={index}
-                  ref={inputRef}
-                  className="w-full border-0 bg-transparent p-0 font-mono text-[1.9rem] text-white outline-none"
-                  value={current}
-                  onChange={handleChange}
-                  onKeyDown={handleKeyDown}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                />
+                {/* On the board rather than loose on the wall photo, and the only
+                    copy of the sentence on screen: you type into this line, so a
+                    second copy of your own text under it is just noise.
+                    Clicking anywhere on the board puts the cursor back, since the
+                    input catching your keystrokes is off screen. */}
+                <div
+                  className={PROMPT_BOARD}
+                  onClick={() => inputRef.current?.focus()}
+                >
+                  <p className="font-mono text-[2.6rem] leading-[1.6]">
+                    <PromptText
+                      sentence={drills[index].sentence}
+                      typed={current}
+                    />
+                  </p>
+                  {/* Invisible on purpose, the same as the Free Type board's:
+                      what you type is drawn into the sentence above. Fixed to the
+                      corner of the viewport, so unlike the board's there's no
+                      scroll for focusing it to throw: one sentence, no page under
+                      it to move. */}
+                  <input
+                    key={index}
+                    ref={inputRef}
+                    className="fixed top-0 left-0 size-px opacity-0"
+                    value={current}
+                    onChange={handleChange}
+                    onKeyDown={handleKeyDown}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                </div>
                 {error && <p className="mt-4 text-[#ff7a70]">{error}</p>}
               </>
             )}
@@ -1036,18 +1097,15 @@ export default function App() {
 
             {phase === "done" && analysis && (
               <div className="flex flex-col gap-7 leading-[1.6]">
-                <h1 className="m-0 text-[2.4rem]">Session complete</h1>
-                {/* self-start, or the flex row stretches and text buttons
-                    render as full-width bars. */}
+                <h1 className="m-0 text-[3.6rem]">Session complete</h1>
+                {/* self-start, or the flex row stretches and the buttons render
+                    as full-width bars. */}
                 <div className="flex gap-8 self-start">
-                  <button
-                    className={`${TEXT_BUTTON} underline underline-offset-4`}
-                    onClick={startSession}
-                  >
+                  <button className={DONE_BUTTON} onClick={startSession}>
                     New session
                   </button>
                   <button
-                    className={`${TEXT_BUTTON} underline underline-offset-4`}
+                    className={DONE_BUTTON}
                     onClick={() => setShowRecap(!showRecap)}
                   >
                     {showRecap ? "Hide stats" : "Show stats"}

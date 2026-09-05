@@ -100,7 +100,7 @@ FREE_TYPE_POOL = [
 # length floor on purpose: three strikes already filters out the one-off slip.
 # Add one back only if the misspellings table fills with words you type fine.
 MISSPELL_STRIKES = 3 # how many times to misspell a word before it gets added to weak words
-MAX_MISSPELL_EDITS = 2 # 
+MAX_MISSPELL_EDITS = 2 # set to avoid counting a different word as a misspell
 
 
 def _within_edits(typed: str, expected: str, cap: int) -> bool:
