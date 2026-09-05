@@ -81,9 +81,13 @@ MAX_WEAK_WORDS = 60
 # POST /words.
 MIN_FREE_TYPE_LENGTH = 5
 MAX_FREE_TYPE_LENGTH = 11
-# One screen's worth: the frontend shows the whole response at once as ten rows
-# of six, and asks again when you've typed through it.
-FREE_TYPE_BOARD = 60
+# Longer than one screen on purpose, and it grows downward: six to a row either
+# way, so this is twenty rows rather than ten. A word you miss is dealt back in
+# five slots ahead, so reaching three strikes needs about ten slots of runway
+# after the first miss. At sixty, missing something late in the board meant it
+# could never get there, and the next board is sixty fresh words out of ~1400,
+# so it wasn't coming back that way either.
+FREE_TYPE_BOARD = 120
 FREE_TYPE_POOL = [
     word
     for word in top_n_list("en", 2000, ascii_only=True)
@@ -92,12 +96,11 @@ FREE_TYPE_POOL = [
 ]
 
 
-# What it takes for a word you typed wrong to start counting against you. The
-# length floor is what keeps short words out: one edit turns "two" into "too"
-# and "the" into "she", which are different words, not misspellings. 
-MISSPELL_STRIKES = 3 # how many times to misspell a word 
-MIN_MISSPELL_LENGTH = 5
-MAX_MISSPELL_EDITS = 2
+# What it takes for a word you typed wrong to start counting against you. No
+# length floor on purpose: three strikes already filters out the one-off slip.
+# Add one back only if the misspellings table fills with words you type fine.
+MISSPELL_STRIKES = 3 # how many times to misspell a word before it gets added to weak words
+MAX_MISSPELL_EDITS = 2 # 
 
 
 def _within_edits(typed: str, expected: str, cap: int) -> bool:
@@ -144,7 +147,7 @@ def find_misspellings(sentence: str, typed: str) -> list[tuple[str, str]]:
 
     found: list[tuple[str, str]] = []
     for i, word in enumerate(expected_words):
-        if len(word) < MIN_MISSPELL_LENGTH or not WORD_PATTERN.match(word):
+        if not WORD_PATTERN.match(word):
             continue
         attempt = typed_words[i] if i < len(typed_words) else ""
         if not attempt or attempt == word:

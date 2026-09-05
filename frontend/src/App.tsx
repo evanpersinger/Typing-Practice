@@ -167,7 +167,9 @@ function FreeWord({
     wrong[i] ? FREE_MISS : i < attempt.length ? "" : FREE_PENDING;
 
   return (
-    <span className="relative">
+    // Tagged so the board can scroll the word you're on back into view: it's
+    // taller than the window, so the caret walks off the bottom otherwise.
+    <span className="relative" data-free-caret={active ? "" : undefined}>
       {letters.map((char, i) => (
         <Fragment key={i}>
           {active && i === attempt.length && <span className={FREE_CARET} />}
@@ -427,7 +429,14 @@ export default function App() {
   }, [tab, phase, index]);
 
   useEffect(() => {
-    if (tab === "free" && freePhase === "typing") freeInputRef.current?.focus();
+    if (tab !== "free" || freePhase !== "typing") return;
+    freeInputRef.current?.focus();
+    // The board runs past the bottom of the window, so the row you're on is
+    // scrolled up to meet you. "nearest" rather than "center", or every word
+    // would yank the page even while the caret is comfortably in view.
+    document
+      .querySelector("[data-free-caret]")
+      ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }, [tab, freePhase, freeIndex]);
 
   // Type through the board and the next one takes its place, rather than the
