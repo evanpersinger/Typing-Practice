@@ -94,10 +94,8 @@ FREE_TYPE_POOL = [
 
 # What it takes for a word you typed wrong to start counting against you. The
 # length floor is what keeps short words out: one edit turns "two" into "too"
-# and "the" into "she", which are different words, not misspellings. Above that
-# floor, being within two edits of the word on screen means you were reaching
-# for that word and mistyped it.
-MISSPELL_STRIKES = 3
+# and "the" into "she", which are different words, not misspellings. 
+MISSPELL_STRIKES = 3 # how many times to misspell a word 
 MIN_MISSPELL_LENGTH = 5
 MAX_MISSPELL_EDITS = 2
 

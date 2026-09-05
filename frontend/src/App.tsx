@@ -39,9 +39,21 @@ const REQUEUE_AFTER = 5;
 // grid of equal columns, because a column wide enough for the longest word
 // strands a five-letter one in the middle of it: this way the rows come out
 // ragged and the words sit exactly one space apart (1ch, in a mono face).
+// Behind anything you read or type, never behind chrome. A solid panel rather
+// than a wash: #4a4f4c is the app's structural grey, and at full strength it
+// gives the words a ground of their own instead of the wall photo's changing
+// one. No border, the fill is the edge.
+const WORD_SURFACE = "rounded-xl bg-[#4a4f4c]";
+
 const FREE_COLUMNS = 6;
+// min-w, not w-fit alone: the width would otherwise track whichever row is
+// currently widest, so swapping in a new board would resize the panel. 52ch is
+// set just above what rows actually reach (measured 37-48 across a board), not
+// at the 71ch six 11-character words could theoretically hit, which left the
+// panel a third wider than anything in it. Real boards land under this, so the
+// width holds still; an unusually long one grows it, and only between rounds.
 const FREE_BOARD =
-  "flex w-fit flex-col gap-y-5 rounded-xl border-[6px] border-[#4a4f4c] " +
+  `flex w-fit min-w-[52ch] flex-col gap-y-5 ${WORD_SURFACE} ` +
   "px-10 py-8 font-mono text-[1.6rem] leading-none";
 
 // A letter you got wrong, anywhere on the board. The same red the error line
@@ -115,9 +127,10 @@ const WORD_SLOTS = WORD_COLUMNS * WORD_ROWS;
 const WORD_TABLE_WIDTH = "w-[1095px] shrink-0";
 type Phase = "idle" | "loading" | "typing" | "submitting" | "done";
 
-// Free Type has no submit step: there's nothing to send at the end, words are
-// added the moment they earn it, so it goes straight from typing to done.
-type FreePhase = "idle" | "loading" | "typing" | "done";
+// No done phase: there's nothing to submit and nothing to report, words are
+// added the moment they earn it, so ending a round drops you back on the start
+// screen rather than at a summary you'd have to click through.
+type FreePhase = "idle" | "loading" | "typing";
 
 /**
  * One word on the Free Type board, drawn character by character so what you
@@ -154,14 +167,20 @@ function FreeWord({
     wrong[i] ? FREE_MISS : i < attempt.length ? "" : FREE_PENDING;
 
   return (
-    <span>
+    <span className="relative">
       {letters.map((char, i) => (
         <Fragment key={i}>
           {active && i === attempt.length && <span className={FREE_CARET} />}
           <span className={letterClass(i)}>{char}</span>
         </Fragment>
       ))}
-      {overflow && <span className={FREE_MISS}>{overflow}</span>}
+      {/* Out of flow, or typing past the end of a word widens it and shoves
+          every word after it along the row while you're mid-keystroke. */}
+      {overflow && (
+        <span className={`${FREE_MISS} absolute top-0 left-full`}>
+          {overflow}
+        </span>
+      )}
       {active && attempt.length >= word.length && (
         <span className={FREE_CARET} />
       )}
@@ -651,9 +670,12 @@ export default function App() {
         // different words anyway, so it just doesn't come round again.
         const at = freeIndex + REQUEUE_AFTER;
         if (at >= words.length) return words;
+        // Overwrite that slot rather than splicing into it. An insert shifts
+        // every word after it one place along, which regroups all the rows and
+        // moves words you're about to type. This swaps one word you haven't
+        // reached yet and leaves every other position exactly where it was.
         const next = [...words];
-        next.splice(at, 0, word);
-        next.pop();
+        next[at] = word;
         return next;
       });
       return;
@@ -817,9 +839,7 @@ export default function App() {
             ? // The board sizes itself to its widest row, so the card takes its
               // width from the board rather than the usual reading cap.
               "m-auto"
-            : freePhase === "done"
-              ? "m-auto w-full max-w-[880px]"
-              : "mx-auto mt-48 mb-0 w-full max-w-[880px] self-start"
+            : "mx-auto mt-48 mb-0 w-full max-w-[880px] self-start"
           : phase === "idle" || phase === "loading"
           ? // The start screen is two short lines; centering them leaves the
             // button floating in an empty page, so it sits high instead. The top
@@ -838,7 +858,7 @@ export default function App() {
     tab === "practice" && phase === "typing"
       ? endSession
       : tab === "free" && freePhase === "typing"
-        ? () => setFreePhase("done")
+        ? resetFreeType
         : null;
 
   const intro =
@@ -1038,12 +1058,15 @@ export default function App() {
               <div onClick={() => freeInputRef.current?.focus()}>
                 {/* Above the board rather than below it: the board grows and
                     shrinks with the word count, so anything under it moves. */}
+                {/* Fixed-width columns: these numbers change while you type,
+                    and without a floor "0" becoming "125" shunts everything
+                    next to it sideways mid-word. */}
                 <div className="mb-6 flex gap-12">
-                  <div className="flex flex-col gap-1">
+                  <div className="flex w-[5ch] flex-col gap-1">
                     <span className="text-[2rem] font-semibold">{freeWpm}</span>
                     <span className="text-[1.1rem]">wpm</span>
                   </div>
-                  <div className="flex flex-col gap-1">
+                  <div className="flex w-[6ch] flex-col gap-1">
                     <span className="text-[2rem] font-semibold">
                       {pct(freeTypedCount - freeMissCount, freeTypedCount)}
                     </span>
@@ -1091,16 +1114,6 @@ export default function App() {
               </div>
             )}
 
-            {/* No recap: nothing here was measured to be kept. The live numbers
-                were the point, and they were on screen the whole time. */}
-            {freePhase === "done" && (
-              <button
-                className={`${TEXT_BUTTON} self-start underline underline-offset-4`}
-                onClick={startFreeType}
-              >
-                Restart session
-              </button>
-            )}
           </>
         )}
 
@@ -1240,7 +1253,7 @@ export default function App() {
                   {/* border-separate keeps each cell its own rounded box
                       instead of collapsing into shared grid lines. */}
                   <table
-                    className={`${WORD_TABLE_WIDTH} table-fixed border-separate border-spacing-2 font-mono text-[1.15rem]`}
+                    className={`${WORD_TABLE_WIDTH} ${WORD_SURFACE} table-fixed border-separate border-spacing-2 p-3 font-mono text-[1.15rem]`}
                   >
                     <tbody>
                       {wordRows.map((row, rowIndex) => (
