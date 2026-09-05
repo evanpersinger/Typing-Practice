@@ -29,7 +29,7 @@ DRILLS: list[tuple[str, list[str]]] = [
 ]
 
 
-def generate_drills(words: list[str] | None = None, count: int = 10) -> GeneratedDrills:
+def generate_drills(words: list[str] | None = None, count: int = 9) -> GeneratedDrills:
     """The canned set. `words` is ignored: there's no weak-word list to serve."""
     return GeneratedDrills(
         drills=[

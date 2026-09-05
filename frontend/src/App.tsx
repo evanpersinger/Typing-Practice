@@ -790,8 +790,9 @@ export default function App() {
         // which is absolute and so contributes no flow height of its own.
         "w-full self-start mt-16"
       : tab === "stats"
-        ? // Stats reads like a page, not a prompt, so it starts top-left.
-          "m-0 w-full max-w-[880px] self-start"
+        ? // Stats reads like a page, not a prompt, so it starts top-left. Same
+          // top margin as the other tabs, to clear the absolute tab bar.
+          "mx-0 mt-16 mb-0 w-full max-w-[880px] self-start"
         : tab === "free"
           ? freePhase === "typing"
             ? // The board sizes itself to its widest row, so the card takes its
@@ -1095,24 +1096,32 @@ export default function App() {
 
             {stats && (
               <div className="flex flex-col gap-8">
-                <section className="flex gap-12">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[2rem] font-semibold">
-                      {pct(totalAttempts - totalMisses, totalAttempts)}
-                    </span>
-                    <span className="text-[1.1rem]">accuracy</span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[2rem] font-semibold">
-                      {stats.typing.avg_wpm}
-                    </span>
-                    <span className="text-[1.1rem]">avg wpm</span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[2rem] font-semibold">
-                      {stats.typing.best_wpm}
-                    </span>
-                    <span className="text-[1.1rem]">best wpm</span>
+                <section>
+                  {/* Bigger than the HEADING used by the sections below it:
+                      this one labels the whole tab, not a section, and says the
+                      numbers under it are all-time rather than per-session. */}
+                  <h2 className="mt-0 mb-2.5 text-[2.6rem] font-semibold">
+                    Total
+                  </h2>
+                  <div className="flex gap-12">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[2rem] font-semibold">
+                        {pct(totalAttempts - totalMisses, totalAttempts)}
+                      </span>
+                      <span className="text-[1.1rem]">accuracy</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[2rem] font-semibold">
+                        {stats.typing.avg_wpm}
+                      </span>
+                      <span className="text-[1.1rem]">avg wpm</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[2rem] font-semibold">
+                        {stats.typing.best_wpm}
+                      </span>
+                      <span className="text-[1.1rem]">best wpm</span>
+                    </div>
                   </div>
                 </section>
 
