@@ -296,39 +296,34 @@ function formatSessionDate(startedAt: string): string {
 interface SessionRecapProps {
   words: WordResult[];
   typing: TypingStats;
-  patternSummary: string | null;
   newWords: NewWord[];
 }
 
 /**
- * The pattern/speed/word-table recap, shared between the screen you land on
- * right after finishing a session and a past session pulled up from the
- * Stats tab dropdown. Same shape either way, live results or fetched ones.
+ * The score/word-table recap, shared between the screen you land on right
+ * after finishing a session and a past session pulled up from the Stats tab
+ * dropdown. Same shape either way, live results or fetched ones.
  */
-function SessionRecap({
-  words,
-  typing,
-  patternSummary,
-  newWords,
-}: SessionRecapProps) {
+function SessionRecap({ words, typing, newWords }: SessionRecapProps) {
   const correctCount = words.filter((w) => w.correct).length;
   const recap = recapWords(words);
 
   return (
     <>
-      <section>
-        <h2 className={HEADING}>overall</h2>
-        <p className="m-0 text-[1.4rem]">
-          You spelled <b>{correctCount}</b> of {words.length} target words
-          right · <b>{pct(correctCount, words.length)}</b> accuracy
+      {/* No headings: each line is one sentence that says what it is, so a
+          label above it is a word you read for nothing. One section rather than
+          one per line, or the gaps read as breaks between sections instead of
+          lines of the same score. Gap on the section, not margins on each line,
+          so the spacing is stated once. */}
+      <section className="flex flex-col gap-1.5 text-[1.4rem]">
+        <p className="m-0">
+          You spelled <b>{correctCount}</b> of {words.length} target words right
         </p>
-      </section>
-
-      <section>
-        <h2 className={HEADING}>speed</h2>
-        <p className="m-0 text-[1.4rem]">
-          <b>{typing.avg_wpm}</b> wpm average · <b>{typing.best_wpm}</b> wpm
-          best sentence
+        <p className="m-0">
+          <b>{pct(correctCount, words.length)}</b> accuracy
+        </p>
+        <p className="m-0">
+          <b>{typing.avg_wpm}</b> wpm average
         </p>
       </section>
 
@@ -364,13 +359,6 @@ function SessionRecap({
           </tbody>
         </table>
       </section>
-
-      {patternSummary && (
-        <section>
-          <h2 className={HEADING}>pattern</h2>
-          <p className="m-0 text-[1.4rem]">{patternSummary}</p>
-        </section>
-      )}
 
       {newWords.length > 0 && (
         <section>
@@ -947,7 +935,7 @@ export default function App() {
 
   const intro =
     tab === "practice" && phase !== "typing"
-      ? "Sentences written around the words you misspell most often. Type each one exactly as it appears, and at the end you get told what your mistakes have in common."
+      ? "Sentences written around the words you misspell most often. Type each one exactly as it appears, and at the end you get your accuracy, your speed, and every word you missed."
       : tab === "free" && freePhase !== "typing"
         ? "Common English words you haven't flagged yet, here to catch the ones you didn't know you were getting wrong. Type each word and press space; miss the same word three times and it joins your weak list."
         : null;
@@ -1115,7 +1103,6 @@ export default function App() {
                   <SessionRecap
                     words={results}
                     typing={analysis.typing}
-                    patternSummary={analysis.pattern_summary}
                     newWords={analysis.new_words}
                   />
                 )}
@@ -1249,12 +1236,6 @@ export default function App() {
                       </span>
                       <span className="text-[1.1rem]">avg wpm</span>
                     </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[2rem] font-semibold">
-                        {stats.typing.best_wpm}
-                      </span>
-                      <span className="text-[1.1rem]">best wpm</span>
-                    </div>
                   </div>
                 </section>
 
@@ -1311,7 +1292,6 @@ export default function App() {
                         <SessionRecap
                           words={sessionDetail.words}
                           typing={sessionDetail.typing}
-                          patternSummary={sessionDetail.pattern_summary}
                           newWords={sessionDetail.new_words}
                         />
                       </div>

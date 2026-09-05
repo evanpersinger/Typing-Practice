@@ -91,9 +91,8 @@ def init_db() -> None:
             );
 
             CREATE TABLE IF NOT EXISTS sessions (
-                id              INTEGER PRIMARY KEY,
-                started_at      TEXT NOT NULL DEFAULT (datetime('now')),
-                pattern_summary TEXT
+                id         INTEGER PRIMARY KEY,
+                started_at TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
             CREATE TABLE IF NOT EXISTS session_new_words (
@@ -135,7 +134,6 @@ def init_db() -> None:
         # their boundaries from timestamps would invent history we don't have.
         _add_column(conn, "attempts", "session_id INTEGER REFERENCES sessions(id)")
         _add_column(conn, "drills", "session_id INTEGER REFERENCES sessions(id)")
-        _add_column(conn, "sessions", "pattern_summary TEXT")
 
 
 def _add_column(conn: sqlite3.Connection, table: str, declaration: str) -> None:
@@ -300,8 +298,7 @@ def get_typing_stats(session_id: int | None = None) -> dict[str, int]:
             """
             SELECT COUNT(*)           AS drills,
                    SUM(LENGTH(typed)) AS chars,
-                   SUM(duration_ms)   AS total_ms,
-                   MAX(LENGTH(typed) * 60000.0 / (5 * duration_ms)) AS best_wpm
+                   SUM(duration_ms)   AS total_ms
             FROM drills
             WHERE duration_ms > 0
               AND LENGTH(typed) > 0
@@ -313,12 +310,11 @@ def get_typing_stats(session_id: int | None = None) -> dict[str, int]:
     # A skipped sentence has no time and no text, so it's filtered out above.
     # With every row filtered the SUMs come back NULL, hence the early return.
     if not row["drills"]:
-        return {"drills": 0, "avg_wpm": 0, "best_wpm": 0}
+        return {"drills": 0, "avg_wpm": 0}
 
     return {
         "drills": row["drills"],
         "avg_wpm": round(row["chars"] * 60000 / (5 * row["total_ms"])),
-        "best_wpm": round(row["best_wpm"]),
     }
 
 
@@ -364,11 +360,7 @@ def record_result(
         )
 
 
-def write_session_transcript(
-    drills: list[dict],
-    pattern_summary: str,
-    new_words: list[dict],
-) -> Path:
+def write_session_transcript(drills: list[dict], new_words: list[dict]) -> Path:
     """Write one markdown file per session into sessions/ as a running history.
 
     `drills` is a list of
@@ -392,10 +384,6 @@ def write_session_transcript(
         lines.append("Targets: " + (", ".join(targets) if targets else "none"))
         lines.append("")
 
-    lines.append("## Pattern")
-    lines.append(pattern_summary)
-    lines.append("")
-
     if new_words:
         lines.append("## Added to your list")
         for w in new_words:
@@ -406,14 +394,10 @@ def write_session_transcript(
     return path
 
 
-def finish_session(session_id: int, pattern_summary: str, new_words: list[dict]) -> None:
-    """Persist the agent's read on a session once it's done, so a past session
-    can show the same pattern and additions the results screen showed live."""
+def finish_session(session_id: int, new_words: list[dict]) -> None:
+    """Record the words a session earned, so a past session pulled up from the
+    Stats tab shows the same additions the results screen showed live."""
     with _connect() as conn:
-        conn.execute(
-            "UPDATE sessions SET pattern_summary = ? WHERE id = ?",
-            (pattern_summary, session_id),
-        )
         for w in new_words:
             conn.execute(
                 "INSERT INTO session_new_words (session_id, word, reason) VALUES (?, ?, ?)",
@@ -442,7 +426,7 @@ def get_session_detail(session_id: int) -> dict | None:
     same shape the results screen already renders live after finishing."""
     with _connect() as conn:
         session = conn.execute(
-            "SELECT id, started_at, pattern_summary FROM sessions WHERE id = ?",
+            "SELECT id, started_at FROM sessions WHERE id = ?",
             (session_id,),
         ).fetchone()
         if session is None:
@@ -459,7 +443,6 @@ def get_session_detail(session_id: int) -> dict | None:
     return {
         "id": session["id"],
         "started_at": session["started_at"],
-        "pattern_summary": session["pattern_summary"],
         "words": [
             {"word": w["word"], "typed": w["typed"], "correct": bool(w["correct"])}
             for w in words

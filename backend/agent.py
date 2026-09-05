@@ -1,8 +1,7 @@
-"""The two model calls that run at the edges of a session.
+"""The one model call in the app: writing a session's practice sentences.
 
-Nothing here touches the keystroke loop, the app only calls these at session
-start (generate practice sentences) and session end (find the typo pattern and
-suggest new words). Set LLM_PROVIDER in .env to pick which provider runs them.
+Nothing here touches the keystroke loop, the app only calls this at session
+start. Set LLM_PROVIDER in .env to pick which provider runs it.
 """
 
 from __future__ import annotations
@@ -118,12 +117,6 @@ class GeneratedDrills(BaseModel):
     drills: list[Drill]
 
 
-class Analysis(BaseModel):
-    pattern_summary: str
-
-
-# session start: generate practice sentences
-
 def generate_drills(words: list[str], count: int = 9) -> GeneratedDrills:
     joined = ", ".join(words)
     prompt = (
@@ -136,26 +129,3 @@ def generate_drills(words: list[str], count: int = 9) -> GeneratedDrills:
         "For each item, list which of the target words it contains."
     )
     return _parse(prompt, 1000, GeneratedDrills)
-
-
-# session end: find the pattern behind the misses
-def analyze_session(misses: list[dict]) -> Analysis:
-    """`misses` is a list of {"word": target, "typed": what_the_user_typed}.
-
-    The model reads the misses and nothing else. It used to also nominate words
-    to practice next, which is a guess about words you have never typed, and
-    get_drilling_words ranks an unattempted word above every word you actually
-    keep getting wrong. Words earn their place by being misspelled now.
-    """
-    if not misses:
-        return Analysis(pattern_summary="No misses this session, clean run.")
-
-    lines = "\n".join(f"- target '{m['word']}' typed as '{m['typed']}'" for m in misses)
-    prompt = (
-        "A user is practicing typing to break habitual misspellings. Here are the "
-        "words they got wrong this session, with what they actually typed:\n"
-        f"{lines}\n\n"
-        "In one or two plain sentences, describe the pattern behind these mistakes "
-        "(e.g. letter transposition, dropped double letters, ie/ei swaps)."
-    )
-    return _parse(prompt, 1500, Analysis)

@@ -55,7 +55,6 @@ export interface WordStat {
 export interface TypingStats {
   drills: number;
   avg_wpm: number;
-  best_wpm: number;
 }
 
 export interface StatsResponse {
@@ -69,7 +68,6 @@ export interface NewWord {
 }
 
 export interface AnalysisResponse {
-  pattern_summary: string;
   new_words: NewWord[];
   // Speed for the session you just finished, from the same query that backs the
   // stats tab, so the two numbers can never disagree.
@@ -90,7 +88,6 @@ export interface SessionSummary {
 export interface SessionDetail {
   id: number;
   started_at: string;
-  pattern_summary: string | null;
   words: WordResult[];
   new_words: NewWord[];
   typing: TypingStats;

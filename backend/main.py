@@ -258,12 +258,11 @@ def get_stats(profile: Profile):
 
 @app.post("/results")
 def submit_results(payload: ResultsPayload, profile: Profile):
-    """Session end: bookkeeping in code, pattern-finding via the agent."""
+    """Session end: all bookkeeping, no model call."""
     # One POST is one sitting, so the session boundary is already here in the
     # request. Nothing has to infer it from timestamps later.
     session_id = db.start_session()
 
-    misses: list[dict] = []
     tracked = {row["word"] for row in db.get_all_words()}
     earned: list[dict] = []
 
@@ -271,8 +270,6 @@ def submit_results(payload: ResultsPayload, profile: Profile):
         db.record_drill(drill.sentence, drill.typed, drill.duration_ms, session_id)
         for word in drill.words:
             db.record_result(word.word, word.typed, word.correct, session_id)
-            if not word.correct:
-                misses.append({"word": word.word, "typed": word.typed})
 
         # Every other word in the sentence. The graded ones above are already on
         # your list; these are the ones nothing was watching, and three misses
@@ -293,21 +290,14 @@ def submit_results(payload: ResultsPayload, profile: Profile):
                 }
             )
 
-    analysis = agent_for(profile).analyze_session(misses)
-
     # Suggestions are recorded, not added. get_drilling_words ranks unattempted
     # words above everything else, so a word added here would outrank the words
     # you actually keep missing until you'd practiced it once. Five a session was
     # enough to fill most of the next session with the model's guesses. They go
     # on your list when you say so, from the recap.
-    db.finish_session(session_id, analysis.pattern_summary, earned)
-    db.write_session_transcript(
-        [d.model_dump() for d in payload.results],
-        analysis.pattern_summary,
-        earned,
-    )
+    db.finish_session(session_id, earned)
+    db.write_session_transcript([d.model_dump() for d in payload.results], earned)
     return {
-        "pattern_summary": analysis.pattern_summary,
         "new_words": earned,
         "typing": db.get_typing_stats(session_id),
     }

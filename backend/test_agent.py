@@ -1,9 +1,9 @@
 """A stand-in for `agent`, used by the testing profile.
 
-Same two functions, same return types, no network. The real agent spends 10-30
-seconds on Claude at session start and again at session end, which is fine when
-you're practicing and miserable when you're clicking through the UI for the
-tenth time to check a button.
+Same function, same return type, no network. The real agent spends 10-30
+seconds on Claude at session start, which is fine when you're practicing and
+miserable when you're clicking through the UI for the tenth time to check a
+button.
 
 The sentences are fixed rather than generated, so a testing session is also
 repeatable: the same words come up every time, and you always know which ones
@@ -12,7 +12,7 @@ you're about to misspell on purpose.
 
 from __future__ import annotations
 
-from backend.agent import Analysis, Drill, GeneratedDrills
+from backend.agent import Drill, GeneratedDrills
 
 # Short on purpose. You're exercising the app, not practicing.
 DRILLS: list[tuple[str, list[str]]] = [
@@ -36,16 +36,4 @@ def generate_drills(words: list[str] | None = None, count: int = 9) -> Generated
             Drill(sentence=sentence, target_words=targets)
             for sentence, targets in DRILLS[:count]
         ]
-    )
-
-
-def analyze_session(misses: list[dict]) -> Analysis:
-    """A canned analysis, shaped like the real one so the results screen still
-    gets exercised."""
-    if not misses:
-        return Analysis(pattern_summary="No misses this session, clean run.")
-
-    typos = ", ".join(f"{m['word']} -> {m['typed']}" for m in misses[:5])
-    return Analysis(
-        pattern_summary=f"Canned analysis (testing profile). You missed: {typos}."
     )

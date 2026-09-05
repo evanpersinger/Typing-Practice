@@ -3,10 +3,9 @@
 A typing trainer that only drills the words *you* get wrong.
 
 It keeps a list of words you misspell, asks a model to write practice sentences
-around them, grades what you type, and then asks the model what the pattern
-behind your typos was. Words you keep missing stay in rotation. Words you get
-right ten times in a row graduate out. New words are added when you misspell
-them, not when a model guesses you might.
+around them, and grades what you type. Words you keep missing stay in rotation.
+Words you get right ten times in a row graduate out. New words are added when
+you misspell them, not when a model guesses you might.
 
 ## Running it
 
@@ -26,7 +25,7 @@ key in `.env` at the repo root, see below. Both ports are set in the `Makefile`.
 
 ## Providers
 
-The two model calls run against either Anthropic or OpenAI. `LLM_PROVIDER` in
+The one model call runs against either Anthropic or OpenAI. `LLM_PROVIDER` in
 `.env` picks which, and it defaults to `anthropic`, so leaving it out keeps the
 behaviour this app has always had.
 
@@ -40,7 +39,7 @@ Only the key for the provider you're actually using has to be set. Pick one
 whose key is missing and the server names the variable it wants, rather than
 failing halfway through a session with whatever the SDK throws.
 
-The model per provider lives in `MODELS` in `backend/agent.py`. Both prompts are
+The model per provider lives in `MODELS` in `backend/agent.py`. The prompt is
 byte-identical either way; the only thing that differs is the SDK call that
 forces the structured output, and that branch lives in `_parse()` and nowhere
 else.
@@ -66,14 +65,13 @@ time you load the page. Nothing is remembered, on purpose.
 | database | `typing.db` | `typing_test.db` |
 | transcripts | `sessions/` | `sessions_test/` |
 | sentences | written by the model, from your weak words | canned, fixed (`backend/test_agent.py`) |
-| analysis | the model | canned |
 | session start | 10-30s | instant |
 
 Separate files, not a flag on a row. Test data cannot reach your real numbers
 even if something upstream is broken.
 
-Testing exists so you can click through the UI without paying for two model
-calls and waiting half a minute each time. It always serves the same ten
+Testing exists so you can click through the UI without paying for a model call
+and waiting half a minute each time. It always serves the same ten
 sentences, so you know exactly which words you're about to misspell on purpose.
 
 The profile travels as an `X-Profile` header on every request. The backend binds
@@ -88,10 +86,10 @@ it to the request and every read and write follows it from there.
    your first keystroke (not from when the sentence appeared) and pauses if you
    wander off to the Stats tab, so the timing reflects typing and nothing else.
 3. **End.** `POST /results` sends every sentence you finished. The backend
-   records the drill, updates each target word's attempts / misses / streak, and
-   asks the model what pattern connects the misses. It also compares every
-   *other* word in each sentence against what you typed, see **Earning a place
-   on the list**. A transcript is written to `sessions/`.
+   records the drill and updates each target word's attempts / misses / streak.
+   It also compares every *other* word in each sentence against what you typed,
+   see **Earning a place on the list**. No model call: the session ends on
+   arithmetic alone. A transcript is written to `sessions/`.
 
 **End session** quits early and keeps only the sentences you pressed Enter on.
 The half-typed one on screen is dropped: that's an interruption, not a
@@ -123,19 +121,20 @@ Three ways a word gets tracked, and none of them is a model deciding for you.
 2. **You misspell it three times in Free Type**, within one sitting.
 3. **You misspell it three times in practice sentences**, across as many
    sessions as it takes. Every word in a sentence is compared against what you
-   typed, not just the target words. A mismatch counts only if the word is five
-   or more characters and you were within two edits of it, so `seperate` for
-   `separate` counts and typing `same` where the sentence said `two` doesn't:
-   that's a different word, not a misspelling. The running count lives in the
-   `misspellings` table and survives across sessions, because ten sentences is
-   nowhere near enough to get the same word wrong three times.
+   typed, not just the target words. A mismatch counts only if you were within
+   two edits of the word, so `seperate` for `separate` counts and typing `same`
+   where the sentence said `two` doesn't: that's a different word, not a
+   misspelling. There's no minimum word length: three strikes already filters
+   out the one-off slip. The running count lives in the `misspellings` table and
+   survives across sessions, because ten sentences is nowhere near enough to get
+   the same word wrong three times.
 
 The model used to suggest up to five new words per session and add them
 directly. That's gone. `get_drilling_words` ranks never-attempted words above
 everything else, so a suggested word outranked every word you actually kept
 getting wrong until you'd typed it once, and five a session was enough to fill
-most of the next session with guesses. The model still tells you what your
-mistakes have in common, which is the useful half.
+most of the next session with guesses. The model writes sentences now, and
+nothing else.
 
 ## Weak words
 
@@ -181,14 +180,14 @@ let a four-word sentence count as much as a long one.
 ## Layout
 
 - `backend/` — FastAPI server. `main.py` wires up the routes, `db.py`
-  owns all storage and arithmetic, `agent.py`/`test_agent.py` own the model calls.
+  owns all storage and arithmetic, `agent.py`/`test_agent.py` own the model call.
   Nothing else in the app touches SQLite or a model directly.
 - `frontend/` — React + Vite single-page app. Talks to the backend
   through the `/api` proxy; no server-side rendering, no router, one page.
   Styled with Tailwind, so there's no stylesheet to speak of: `index.css` is
   the Tailwind import, the page background, and one keyframe.
 - `sessions/` / `sessions_test/` — one markdown transcript per sitting, written
-  after every drill: prompt, what you typed, and the pattern the model found.
+  after every drill: prompt, what you typed, and which target words you got.
   A readable history, not just database rows. Gitignored, personal and testing
   respectively.
 
@@ -196,8 +195,8 @@ let a four-word sentence count as much as a long one.
 backend/
   main.py        FastAPI: /drills, /free-words, /stats, /results, /words, /sessions.
   db.py          All storage and all arithmetic. The agent never does math.
-  agent.py       The two model calls: write sentences, find the pattern.
-  test_agent.py  Same two functions, canned. Used by the testing profile.
+  agent.py       The one model call: write the practice sentences.
+  test_agent.py  Same function, canned. Used by the testing profile.
 frontend/src/
   App.tsx        The whole UI: profile picker, practice, results, stats, words.
   api.ts         The fetch calls, and the profile header.
@@ -218,7 +217,6 @@ empty: it gets the example list until `seed_words_personal.txt` exists.
   only affects the target words, which are a couple per sentence.
 - **Pasting works.** Nothing stops you pasting the sentence, which records
   perfect accuracy and an absurd wpm.
-- **`best_wpm` is an all-time max**, so one bad row poisons it permanently.
 - **Only target words are scored.** The other words in a sentence are checked
   for misspellings (see above) but never recorded in `attempts`, so they have no
   accuracy or streak of their own until they earn a place on the list. Your raw
