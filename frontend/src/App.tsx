@@ -99,6 +99,16 @@ const TAB =
 const TAB_ON = `${TAB} bg-[#c2a878]/15`;
 const TAB_OFF = `${TAB} hover:bg-[#c2a878]/8`;
 
+// The one action on either start screen. Filled rather than a bare outline, so
+// it reads as something you press instead of a label in a box. The fill is the
+// wall's own colour, not a white wash: white type needs a dark ground, and this
+// one reads as a solid plate cut from the wall rather than a new colour in the
+// app. Hover is an explicit lighter grey rather than the usual white overlay,
+// since two bg utilities on one element resolve by stylesheet order.
+const START_BUTTON =
+  "cursor-pointer rounded-[10px] border border-white bg-[#2a2e2c] px-20 py-9 " +
+  "text-[3.2rem] text-white no-underline hover:bg-[#4a4f4c]";
+
 // The way out of whichever session you're in. Pinned to the bottom-right so it
 // sits opposite the intro blurb and out of the way of the words: a way out, not
 // an invitation.
@@ -939,7 +949,7 @@ export default function App() {
     tab === "practice" && phase !== "typing"
       ? "These sentences include the words you need to practice. Type one sentence at a time. At the end of the session you can view your results."
       : tab === "free" && freePhase !== "typing"
-        ? "Common English words you haven't flagged yet, here to catch the ones you didn't know you were getting wrong. Type each word and press space; miss the same word three times and it joins your weak list."
+        ? "Freely type and get graded on your wpm, accuracy, and what words you misspell the most often."
         : null;
 
   if (profile === null) {
@@ -1024,7 +1034,7 @@ export default function App() {
             {phase === "idle" && (
               <>
                 <button
-                  className="cursor-pointer rounded-[10px] border border-white px-20 py-9 text-[3.2rem] text-white no-underline hover:bg-white/8"
+                  className={START_BUTTON}
                   onClick={startSession}
                 >
                   Start session
@@ -1118,7 +1128,7 @@ export default function App() {
             {freePhase === "idle" && (
               <>
                 <button
-                  className="cursor-pointer rounded-[10px] border border-white px-20 py-9 text-[3.2rem] text-white no-underline hover:bg-white/8"
+                  className={START_BUTTON}
                   onClick={startFreeType}
                 >
                   Start session
