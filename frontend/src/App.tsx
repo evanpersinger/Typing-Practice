@@ -108,12 +108,14 @@ const END_BUTTON =
 
 // What the mode you're on is for, and what you do. Pinned to the corner opposite
 // the profile button and sized like the tab bar, because it's chrome rather than
-// body text. The width cap keeps it off the card behind it.
+// body text. The width cap keeps it off the card behind it. Blue for the same
+// reason the tabs are sand: chrome shouldn't read as the words you're typing.
 const INTRO =
-  "absolute top-7 left-10 m-0 max-w-[280px] text-[1.3rem] leading-[1.45]";
+  "absolute top-7 left-10 m-0 max-w-[280px] text-[1.3rem] leading-[1.45] " +
+  "text-[#78a2c2]";
 
 // Section headings: separated from body text by weight and size alone, never by
-// dimming. Every bit of text on these pages stays pure white.
+// dimming. Every bit of body text stays pure white.
 const HEADING = "mt-0 mb-2.5 text-[1.1rem] font-semibold";
 
 // Both stats tables. The cell rules stay on the table via [&_th]/[&_td] rather
@@ -935,7 +937,7 @@ export default function App() {
 
   const intro =
     tab === "practice" && phase !== "typing"
-      ? "Sentences written around the words you misspell most often. Type each one exactly as it appears, and at the end you get your accuracy, your speed, and every word you missed."
+      ? "These sentences include the words you need to practice. Type one sentence at a time. At the end of the session you can view your results."
       : tab === "free" && freePhase !== "typing"
         ? "Common English words you haven't flagged yet, here to catch the ones you didn't know you were getting wrong. Type each word and press space; miss the same word three times and it joins your weak list."
         : null;
